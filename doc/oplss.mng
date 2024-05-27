@@ -1329,10 +1329,10 @@ relation.  \Rref{e-beta} ensures that our relation \emph{contains
 \emph{congruence relation} (i.e.~if subterms are equal, then larger terms are
 equal), as specified by rules \rref{e-pi,e-lam,e-app}.  We also want to be
 sure that this relation has ``functionality'' (i.e.~we can lift
-equalities). We declare so with \rref{e-lift}. 
+equalities). We declare so with \rref{e-lift}.
 \Rref{e-var} states that a variable is equivalent to its definition in the context.
-Here we add variable definitions to the context, which will later be used 
-when we extend the language to support dependent pattern matching. 
+Here we add variable definitions to the context, which will later be used
+when we extend the language to support dependent pattern matching.
 Finally, we want to ignore type
 annotations, so \rref{e-annot} allows the equality judgment to skip over them
 on the left (and with the help of \rref{e-sym}, on the right as well).
@@ -1409,7 +1409,7 @@ The following judgment (shown in Figure~\ref{fig:whnf})
 %
 \[ \fbox{$[[whnf G |- a ~> nf]]$} \]
 %
-describes when a term $[[a]]$ reduces to some result $[[nf]]$ under context $[[G]]$ 
+describes when a term $[[a]]$ reduces to some result $[[nf]]$ under context $[[G]]$
 in \emph{weak head normal form (whnf)}.  For closed terms, these rules correspond to a
 big-step evaluation relation and produce a value (i.e. abstraction or type
 form).  For open terms, the rules could also produce terms that are a
@@ -1869,17 +1869,17 @@ Complete the file \href{version2/test/Hw2.pi}{\texttt{Hw2.pi}}. This file
 gives you practice with working with equality propositions in \pif.
 
 \paragraph{Example}
-To see an example of propositional equality in action, let's take a look at the function \texttt{sym} in the file \href{version2/test/Hw2.pi}{\texttt{Hw2.pi}}. 
+To see an example of propositional equality in action, let's take a look at the function \texttt{sym} in the file \href{version2/test/Hw2.pi}{\texttt{Hw2.pi}}.
 For convenience, we reproduce the function definition here:
 \begin{piforall}
 sym : (A:Type) -> (x:A) -> (y:A) -> (x = y) -> y = x
 sym = \ A x y pf .
-  subst Refl by pf 
+  subst Refl by pf
 \end{piforall}
-Intuitively, the function \texttt{sym} says: if we supply two terms  \texttt{x} and \texttt{y} (both of type \texttt{A}), along with a proof \texttt{pf} that \texttt{x = y}, then we can prove that \texttt{y = x}.  
+Intuitively, the function \texttt{sym} says: if we supply two terms  \texttt{x} and \texttt{y} (both of type \texttt{A}), along with a proof \texttt{pf} that \texttt{x = y}, then we can prove that \texttt{y = x}.
 Note that the \pif expression \texttt{subst Refl by pf} is doing a pattern-match on the term inhabiting the identity type. In Coq, \pif expressions of the form \texttt{subst a by b} would be written as:
 \begin{verbatim}
-match b with 
+match b with
   Refl => a
 \end{verbatim}
 
@@ -1890,9 +1890,9 @@ sym = \ A x y pf .
   (subst (Refl : x = x) by (pf : x = y) : y = x)
 \end{piforall}
 
-In the body of \texttt{sym}, \texttt{subst} eliminates \texttt{pf} (a proof that \texttt{x = y}) when typechecking \texttt{Refl} against the type \texttt{y = x}. 
-Moreover, the \texttt{subst} keyword adds the definition \texttt{x = y} to the context, meaning that both sides of the equality \texttt{y = x} normalize to \texttt{y}; this is an example of the \rref{c-subst-left} in action. 
-Note that as a result of this rule, the result type of the entire expression \texttt{subst Refl by pf} changes to \texttt{y = x}, which is the desired return type for the function \texttt{sym}. 
+In the body of \texttt{sym}, \texttt{subst} eliminates \texttt{pf} (a proof that \texttt{x = y}) when typechecking \texttt{Refl} against the type \texttt{y = x}.
+Moreover, the \texttt{subst} keyword adds the definition \texttt{x = y} to the context, meaning that both sides of the equality \texttt{y = x} normalize to \texttt{y}; this is an example of the \rref{c-subst-left} in action.
+Note that as a result of this rule, the result type of the entire expression \texttt{subst Refl by pf} changes to \texttt{y = x}, which is the desired return type for the function \texttt{sym}.
 
 
 
@@ -2546,7 +2546,7 @@ data Beautiful (n : Nat) : Type where
   B0 of [n = 0]
   B3 of [n = 3]
   B5 of [n = 5]
-  Bsum of (m1:Nat)(m2:Nat)(Beautiful m1)(Beautiful m2)[m = m1+m2]
+  Bsum of (m1:Nat)(m2:Nat)(Beautiful m1)(Beautiful m2)[n = m1+m2]
 \end{piforall}
 
 Constraints can appear anywhere in the telescope of a data constructor.
