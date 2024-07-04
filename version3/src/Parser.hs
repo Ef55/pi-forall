@@ -277,7 +277,10 @@ trustme :: LParser Term
 trustme = reserved "TRUSTME" *> return (TrustMe )
 
 printme :: LParser Term
-printme = reserved "PRINTME" *> return (PrintMe )
+printme = do
+  pos <- getPosition
+  reserved "PRINTME"
+  return (Pos pos PrintMe )
 
 refl :: LParser Term
 refl =
