@@ -25,6 +25,11 @@ The implementation [README.md](main/README.md) includes instructions about
 how to compile and work with these implementations. Edits should only be for 
 versions in the [main/](main/) directory.
 
+VS Code
+-------
+
+There is a [VS Code plugin](https://github.com/dunhamsteve/pi-forall-vscode) for pi-forall.
+
 History
 -------
 
