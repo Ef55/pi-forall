@@ -372,7 +372,7 @@ G |- A : Type
 ------------------------  ::  lambda
 G |- \x.a : (x:A) -> B
 
-G, x:A |- a : B [ y / x]
+G, x:A |- a : B [x/y]
 G |- A : Type
 ------------------------  ::  altlambda
 G |- \x.a : (y:A) -> B
