@@ -34,11 +34,11 @@ History
 -------
 
 This is a revised version of lecture notes originally presented at OPLSS
-during 2022, 2014, and 2013.
+during 2023, 2022, 2014, and 2013.
 
 Videos from the [2022](https://www.cs.uoregon.edu/research/summerschool/summer22/topics.php) and [2014](https://www.cs.uoregon.edu/research/summerschool/summer14/curriculum.html) lectures are available from the
 OPLSS website. If you watch these videos, you should look at the
-corresponding branch of this repository.
+corresponding branch of this repository. Unfortunately, the [2023](https://www.cs.uoregon.edu/research/summerschool/summer23/topics.php) recordings include only audio, and only for part of the lectures.
 
 An abridged version of these lectures was also given at the Compose
 Conference, January 2015. [Notes](old/compose.md) from this version are also available.
