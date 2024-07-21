@@ -1664,7 +1664,7 @@
 
 \newcommand{\ottdrulecXXletpairXXdef}[1]{\ottdrule[#1]{%
 \ottpremise{\Gamma  \vdash  \ottmv{z}  \Rightarrow   \{  \ottmv{x} \!:\! \ottnt{A_{{\mathrm{1}}}} \ |\  \ottnt{A_{{\mathrm{2}}}}  \} }%
-\ottpremise{  \Gamma ,  \ottmv{x} \! :\! \ottnt{A_{{\mathrm{1}}}}  ,  \ottmv{y} \! :\! \ottnt{B_{{\mathrm{2}}}}   \ottsym{,}  \ottmv{z}  \ottsym{=}  \ottsym{(}  \ottmv{x}  \ottsym{,}  \ottmv{y}  \ottsym{)}  \vdash  \ottnt{b}  \Leftarrow  \ottnt{B}}%
+\ottpremise{  \Gamma ,  \ottmv{x} \! :\! \ottnt{A_{{\mathrm{1}}}}  ,  \ottmv{y} \! :\! \ottnt{A_{{\mathrm{2}}}}   \ottsym{,}  \ottmv{z}  \ottsym{=}  \ottsym{(}  \ottmv{x}  \ottsym{,}  \ottmv{y}  \ottsym{)}  \vdash  \ottnt{b}  \Leftarrow  \ottnt{B}}%
 }{
 \Gamma  \vdash  \ottkw{let} \, \ottsym{(}  \ottmv{x}  \ottsym{,}  \ottmv{y}  \ottsym{)}  \ottsym{=}  \ottmv{z} \, \ottkw{in} \, \ottnt{b}  \Leftarrow  \ottnt{B}}{%
 {\ottdrulename{c\_letpair\_def}}{}%

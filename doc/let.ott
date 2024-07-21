@@ -127,6 +127,6 @@ G, x = False |- b2 <= A
 G |- if x then b1 else b2 <= A
 
 G |- z => { x : A1 | A2 }
-G, x:A1, y:B2, z = (x,y) |- b <= B
+G, x:A1, y:A2, z = (x,y) |- b <= B
 -------------------------------------- :: letpair_def
 G |- let (x,y) = z in b <= B
