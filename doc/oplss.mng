@@ -834,7 +834,7 @@ One issue with this bidirectional system is that it is not closed under
 substitution.  What this means is that given some term $[[b]]$ with a free
 variable, $[[ G, x : A |- b <= B]]$, and another term $[[a]]$ with the same
 type $[[ G |- a <= A]]$ of that variable, we \emph{do not} have a derivation
-$[[ G |- b[a/x] <= A]]$. The reason is that types of variables are always
+$[[ G |- b[a/x] <= B]]$. The reason is that types of variables are always
 inferred, but the term $[[a]]$, may need the type $[[A]]$ to be supplied to
 the type checker.  This issue is particularly annoying in \rref{i-app} when we
 replace a variable (inference mode) with a term that was validated in checking
@@ -1256,7 +1256,7 @@ have a safe \texttt{head} operation that allows us to access the first element o
 vector, as long as it is nonzero.
 
 \begin{piforall}
-head : (A : Nat) -> (n : Nat) -> Vec (Succ n) A -> Vec n A
+head : (A : Nat) -> (n : Nat) -> Vec (Succ n) A -> A
 head = ...
 
 \end{piforall}
