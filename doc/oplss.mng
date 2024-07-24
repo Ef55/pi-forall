@@ -2447,7 +2447,7 @@ be referred to in any of the telescopes for the data constructors.
 \begin{piforall}
 data Maybe (A : Type) : Type where
     Nothing
-     Just of (A)
+    Just of (A)
 
 \end{piforall}
 
