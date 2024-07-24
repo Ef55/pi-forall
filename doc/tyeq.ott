@@ -184,7 +184,7 @@ G |- a <= A [a1/x][refl/y]
 G |- subst a by y <= A
 
 
-G |- a : A
+G |- a => A
 whnf G |-  A ~> (a1 = a2)
 whnf G |-  a1 ~> True
 whnf G |-  a2 ~> False

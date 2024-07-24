@@ -1598,7 +1598,7 @@
 
 
 \newcommand{\ottdrulecXXcontra}[1]{\ottdrule[#1]{%
-\ottpremise{\Gamma  \vdash  \ottnt{a}  \ottsym{:}  \ottnt{A}}%
+\ottpremise{\Gamma  \vdash  \ottnt{a}  \Rightarrow  \ottnt{A}}%
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{A}  \leadsto  \ottsym{(}  \ottnt{a_{{\mathrm{1}}}}  \ottsym{=}  \ottnt{a_{{\mathrm{2}}}}  \ottsym{)} }%
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{a_{{\mathrm{1}}}}  \leadsto  \ottkw{True} }%
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{a_{{\mathrm{2}}}}  \leadsto  \ottkw{False} }%
