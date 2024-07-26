@@ -146,11 +146,11 @@ G |- ImTrue a1 a2 : SillyBool
    
 G |- a : T
 </ G |- pati : T => Di // i />
-</ G, Di |- ai : A // i />
-G |- A : Type
+</ G, Di |- bi : B // i />
+G |- B : Type
 branches exhaustive
 ---------------------------------------------------- :: case_simple
-G |- case a of { </ pati -> ai // i /> } : A
+G |- case a of { </ pati -> bi // i /> } : B
 
 
 
@@ -183,10 +183,10 @@ G |- a => A
 whnf G |-  A ~> T
 </ G |- pati : T => Di // i />
 </ |- a ~ pati => Di' // i />
-</ G, Di , Di' |- ai : A // i />
+</ G, Di , Di' |- bi <= B // i />
 branches exhaustive
 --------------------------------------------------------  :: case_simple
-G |- case a of { </ pati -> ai // i /> } <= A
+G |- case a of { </ pati -> bi // i /> } <= B
 
 
 G |- a => A

@@ -1107,11 +1107,11 @@
 \newcommand{\ottdruletXXcaseXXsimple}[1]{\ottdrule[#1]{%
 \ottpremise{\Gamma  \vdash  \ottnt{a}  \ottsym{:}  \ottmv{T} \, }%
 \ottpremise{\ottcomp{\Gamma  \vdash  \ottnt{pat_{\ottmv{i}}}  \ottsym{:}  \ottmv{T} \,   \Rightarrow  \Delta_{\ottmv{i}}}{\ottmv{i}}}%
-\ottpremise{\ottcomp{\Gamma  \ottsym{,}  \Delta_{\ottmv{i}}  \vdash  \ottnt{a_{\ottmv{i}}}  \ottsym{:}  \ottnt{A}}{\ottmv{i}}}%
-\ottpremise{\Gamma  \vdash  \ottnt{A}  \ottsym{:}  \ottkw{Type}}%
+\ottpremise{\ottcomp{\Gamma  \ottsym{,}  \Delta_{\ottmv{i}}  \vdash  \ottnt{b_{\ottmv{i}}}  \ottsym{:}  \ottnt{B}}{\ottmv{i}}}%
+\ottpremise{\Gamma  \vdash  \ottnt{B}  \ottsym{:}  \ottkw{Type}}%
 \ottpremise{\ottkw{branches} \, \ottkw{exhaustive}}%
 }{
-\Gamma  \vdash  \ottkw{case} \, \ottnt{a} \, \ottkw{of} \, \ottsym{\{} \, \ottcomp{\ottnt{pat_{\ottmv{i}}}  \to  \ottnt{a_{\ottmv{i}}}}{\ottmv{i}} \, \ottsym{\}}  \ottsym{:}  \ottnt{A}}{%
+\Gamma  \vdash  \ottkw{case} \, \ottnt{a} \, \ottkw{of} \, \ottsym{\{} \, \ottcomp{\ottnt{pat_{\ottmv{i}}}  \to  \ottnt{b_{\ottmv{i}}}}{\ottmv{i}} \, \ottsym{\}}  \ottsym{:}  \ottnt{B}}{%
 {\ottdrulename{t\_case\_simple}}{}%
 }}
 
@@ -1598,7 +1598,7 @@
 
 
 \newcommand{\ottdrulecXXcontra}[1]{\ottdrule[#1]{%
-\ottpremise{\Gamma  \vdash  \ottnt{a}  \ottsym{:}  \ottnt{A}}%
+\ottpremise{\Gamma  \vdash  \ottnt{a}  \Rightarrow  \ottnt{A}}%
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{A}  \leadsto  \ottsym{(}  \ottnt{a_{{\mathrm{1}}}}  \ottsym{=}  \ottnt{a_{{\mathrm{2}}}}  \ottsym{)} }%
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{a_{{\mathrm{1}}}}  \leadsto  \ottkw{True} }%
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{a_{{\mathrm{2}}}}  \leadsto  \ottkw{False} }%
@@ -1613,10 +1613,10 @@
 \ottpremise{ \Gamma   \vdash   \ottkw{whnf} \  \ottnt{A}  \leadsto  \ottmv{T} \,  }%
 \ottpremise{\ottcomp{\Gamma  \vdash  \ottnt{pat_{\ottmv{i}}}  \ottsym{:}  \ottmv{T} \,   \Rightarrow  \Delta_{\ottmv{i}}}{\ottmv{i}}}%
 \ottpremise{\ottcomp{\vdash  \ottnt{a}  \sim  \ottnt{pat_{\ottmv{i}}}  \Rightarrow  \Delta'_{\ottmv{i}}}{\ottmv{i}}}%
-\ottpremise{\ottcomp{\Gamma  \ottsym{,}  \Delta_{\ottmv{i}}  \ottsym{,}  \Delta'_{\ottmv{i}}  \vdash  \ottnt{a_{\ottmv{i}}}  \ottsym{:}  \ottnt{A}}{\ottmv{i}}}%
+\ottpremise{\ottcomp{\Gamma  \ottsym{,}  \Delta_{\ottmv{i}}  \ottsym{,}  \Delta'_{\ottmv{i}}  \vdash  \ottnt{b_{\ottmv{i}}}  \Leftarrow  \ottnt{B}}{\ottmv{i}}}%
 \ottpremise{\ottkw{branches} \, \ottkw{exhaustive}}%
 }{
-\Gamma  \vdash  \ottkw{case} \, \ottnt{a} \, \ottkw{of} \, \ottsym{\{} \, \ottcomp{\ottnt{pat_{\ottmv{i}}}  \to  \ottnt{a_{\ottmv{i}}}}{\ottmv{i}} \, \ottsym{\}}  \Leftarrow  \ottnt{A}}{%
+\Gamma  \vdash  \ottkw{case} \, \ottnt{a} \, \ottkw{of} \, \ottsym{\{} \, \ottcomp{\ottnt{pat_{\ottmv{i}}}  \to  \ottnt{b_{\ottmv{i}}}}{\ottmv{i}} \, \ottsym{\}}  \Leftarrow  \ottnt{B}}{%
 {\ottdrulename{c\_case\_simple}}{}%
 }}
 
