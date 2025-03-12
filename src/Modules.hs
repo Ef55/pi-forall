@@ -1,92 +1,107 @@
 {- pi-forall language -}
 
 -- | Tools for working with multiple source files
-module Modules(getModules, ModuleInfo(..)) where
+module Modules (getModules, ModuleInfo (..)) where
 
-import Syntax
 import ConcreteSyntax qualified as C
-import Parser
-import PrettyPrint
-import TypeCheck
-import ScopeCheck
-import Environment
-
-import Text.ParserCombinators.Parsec.Error ( ParseError, errorPos )
-
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State.Lazy
-import System.FilePath
+import Data.Graph qualified as Gr
+import Data.List (nub, (\\))
+import Environment
+import Parser
+import PrettyPrint
+import ScopeCheck
+import Syntax
 import System.Directory
-import qualified Data.Graph as Gr
-import Data.List(nub,(\\))
+import System.Environment (getArgs)
+import System.Exit (exitFailure, exitSuccess)
+import System.FilePath
+import Text.ParserCombinators.Parsec.Error (ParseError, errorPos)
+import TypeCheck
 
-import System.Environment(getArgs)
-import System.Exit (exitFailure,exitSuccess)
 -- import System.FilePath (splitFileName)
-
 
 -- | getModules starts with a top-level module, and gathers all of the module's
 -- transitive dependency. It returns the list of parsed modules, with all
 -- modules appearing after its dependencies.
-getModules
-  :: (Functor m, MonadError ParseError m, MonadIO m) =>
-     [FilePath] -> String -> m [Module]
+getModules ::
+  (Functor m, MonadError ParseError m, MonadIO m) =>
+  [FilePath] ->
+  String ->
+  m [Module]
 getModules prefixes top = do
   toParse <- gatherModules prefixes [ModuleImport top]
   flip evalStateT initialConstructorNames $ mapM reparse toParse
 
-data ModuleInfo = ModuleInfo {
-                    modInfoName     :: ModuleName,
-                    modInfoFilename :: String,
-                    modInfoImports  :: [ModuleImport]
-                  }
+data ModuleInfo = ModuleInfo
+  { modInfoName :: ModuleName,
+    modInfoFilename :: String,
+    modInfoImports :: [ModuleImport]
+  }
 
 -- | Build the module dependency graph.
 --   This only parses the imports part of each file; later we go back and parse all of it.
-gatherModules
-  :: (Functor m, MonadError ParseError m, MonadIO m) =>
-     [FilePath] -> [ModuleImport] -> m [ModuleInfo]
-gatherModules prefixes ms = gatherModules' ms [] where
-  gatherModules' [] accum = return $ topSort accum
-  gatherModules' ((ModuleImport m):ms') accum = do
-    modFileName <- getModuleFileName prefixes m
-    cmod <- parseModuleImports modFileName
-    let imports = C.moduleImports cmod
-    let accum' = ModuleInfo m modFileName imports :accum
-    let oldMods = map (ModuleImport . modInfoName) accum'
-    gatherModules' (nub (ms' ++ imports) \\ oldMods) accum'
+gatherModules ::
+  (Functor m, MonadError ParseError m, MonadIO m) =>
+  [FilePath] ->
+  [ModuleImport] ->
+  m [ModuleInfo]
+gatherModules prefixes ms = gatherModules' ms []
+  where
+    gatherModules' [] accum = return $ topSort accum
+    gatherModules' ((ModuleImport m) : ms') accum = do
+      modFileName <- getModuleFileName prefixes m
+      cmod <- parseModuleImports modFileName
+      let imports = C.moduleImports cmod
+      let accum' = ModuleInfo m modFileName imports : accum
+      let oldMods = map (ModuleImport . modInfoName) accum'
+      gatherModules' (nub (ms' ++ imports) \\ oldMods) accum'
 
 -- | Generate a sorted list of modules, with the postcondition that a module
 -- will appear _after_ any of its dependencies.
 topSort :: [ModuleInfo] -> [ModuleInfo]
 topSort ms = reverse sorted
-  where (gr,lu) = Gr.graphFromEdges' [(m, modInfoName m, [i | ModuleImport i <- modInfoImports m])
-                                      | m <- ms]
-        lu' v = let (m,_,_) = lu v in m
-        sorted = [lu' v | v <- Gr.topSort gr]
+  where
+    (gr, lu) =
+      Gr.graphFromEdges'
+        [ (m, modInfoName m, [i | ModuleImport i <- modInfoImports m])
+          | m <- ms
+        ]
+    lu' v = let (m, _, _) = lu v in m
+    sorted = [lu' v | v <- Gr.topSort gr]
 
 -- | Find the file associated with a module.
-getModuleFileName :: (MonadIO m)
-                  => [FilePath] -> ModuleName -> m FilePath
+getModuleFileName ::
+  (MonadIO m) =>
+  [FilePath] ->
+  ModuleName ->
+  m FilePath
 getModuleFileName prefixes modul = do
   let makeFileName prefix = prefix </> mDotPi
       -- get M.pi from M or M.pi
-      mDotPi = if takeExtension s == ".pi"
-                    then s
-                    else s <.> "pi"
+      mDotPi =
+        if takeExtension s == ".pi"
+          then s
+          else s <.> "pi"
       s = modul
       possibleFiles = map makeFileName prefixes
   files <- liftIO $ filterM doesFileExist possibleFiles
   if null files
-     then error $ "Can't locate module: " ++ show modul ++
-                "\nTried: " ++ show possibleFiles
-     else return $ head files
+    then
+      error $
+        "Can't locate module: "
+          ++ show modul
+          ++ "\nTried: "
+          ++ show possibleFiles
+    else return $ head files
 
 -- | Fully parse a module (not just the imports).
-
-reparse :: (MonadError ParseError m, MonadIO m, MonadState ConstructorNames m) =>
-            ModuleInfo -> m Module
+reparse ::
+  (MonadError ParseError m, MonadIO m, MonadState ConstructorNames m) =>
+  ModuleInfo ->
+  m Module
 reparse (ModuleInfo _ fileName _) = do
   cnames <- get
   cmodu <- parseModuleFile cnames fileName
@@ -94,8 +109,6 @@ reparse (ModuleInfo _ fileName _) = do
   case scopeCheckModule cmodu of
     Just m -> return m
     Nothing -> error $ "scope checking failed"
-
-
 
 exitWith :: Either a b -> (a -> IO ()) -> IO b
 exitWith res f =
@@ -148,7 +161,6 @@ goFilename pathToMainFile = do
   mapM_ (putStr . show) logs
   defs <- d `exitWith` (putTypeError . flip displayErr initDI)
   putStrLn $ pp (last defs)
-
 
 -- | 'pi <filename>' invokes the type checker on the given
 -- file and either prints the types of all definitions in the module
