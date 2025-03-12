@@ -24,7 +24,7 @@ import Data.Maybe (catMaybes)
 import Data.SNat qualified as SNat
 import Environment (Context, TcMonad)
 import Environment qualified as Env
-import Equal qualified as Equal
+import Equal qualified
 import Log qualified
 import PrettyPrint (D (..), Display (..), debug, disp, pp)
 import Prettyprinter (pretty)
@@ -234,7 +234,7 @@ checkType tm ty ctx = do
                 DC (length args),
                 DS "arguments."
               ]
-          newTele <- substTele False delta params theta
+          newTele <- substTele True delta params theta
           (r', ref) <- tcArgTele args newTele ctx
           return ()
         _ ->
