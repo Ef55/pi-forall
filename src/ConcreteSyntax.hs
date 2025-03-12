@@ -75,6 +75,7 @@ data ModuleEntry
   = ModuleDecl {declName :: GlobalName, declType :: Typ}
   | ModuleDef {declName :: GlobalName, declTerm :: Term}
   | ModuleData {declName :: GlobalName, declData :: DataDef}
+  | ModuleFail {failing :: ModuleEntry}
 
 -- | Datatype definitions
 data DataDef = DataDef
