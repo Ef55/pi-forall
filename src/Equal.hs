@@ -3,10 +3,10 @@ module Equal where
 
 import Data.SNat qualified as SNat
 
-import PiForall.Syntax
-import PiForall.Environment (TcMonad, Context )
-import qualified PiForall.Environment as Env
-import PiForall.PrettyPrint
+import Syntax
+import Environment (TcMonad, Context )
+import qualified Environment as Env
+import PrettyPrint
 
 import AutoEnv.Env as Env
 import AutoEnv
@@ -16,8 +16,6 @@ import AutoEnv.Bind.Local as L
 import AutoEnv.Bind.Scoped as Scoped
 
 import Prettyprinter as PP
-
-import Debug.Trace
 
 import Control.Monad(unless, zipWithM, zipWithM_)
 import Control.Monad.Except (catchError)

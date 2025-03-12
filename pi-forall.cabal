@@ -35,7 +35,7 @@ common common-stanza
     , mtl
     , brick
     , vty
-    , fin >= 0.3.2
+    , fin
     , vec
   default-language:
     GHC2021
@@ -66,9 +66,17 @@ library
       , ScopeCheck
       , Modules
       , TypeCheck
+      , Log
   hs-source-dirs:
       src
-      , examples
 
-
-
+test-suite test-pi-forall
+  import: common-stanza
+  build-depends: pi-forall
+    , directory
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
