@@ -602,32 +602,34 @@ data HintOrCtx
 tcEntry :: ModuleEntry -> TcMonad Z HintOrCtx
 tcEntry (ModuleDef n term) =
   do
-    term' <- Env.lookupGlobalDef n
-    Env.extendSourceLocation
-      (unPosFlaky term)
-      term
-      ( Env.err
-          [ DS "Multiple definitions of",
-            DC n,
-            DS "Previous definition was",
-            DD term'
-          ]
-      )
-    `catchError` \_ -> do
-      lkup <- Env.lookupHint n
-      case lkup of
-        Nothing -> do
-          ty <- inferType term Env.emptyContext
-          return $ AddCtx [ModuleDecl n ty, ModuleDef n term]
-        Just ty -> do
-          let decl = ModuleDecl n ty
-          Env.extendCtx decl $ checkType term ty Env.emptyContext
-          return (AddCtx [decl, ModuleDef n term])
-            `Env.extendErr` [ DS "When checking the term",
-                              DD term,
-                              DS "against the type",
-                              DC decl
-                            ]
+    r <- Env.ensureError $ Env.lookupGlobalDef n
+    case r of
+      Left _ -> do
+        lkup <- Env.lookupHint n
+        case lkup of
+          Nothing -> do
+            ty <- inferType term Env.emptyContext
+            return $ AddCtx [ModuleDecl n ty, ModuleDef n term]
+          Just ty -> do
+            let decl = ModuleDecl n ty
+            Env.extendCtx decl $ checkType term ty Env.emptyContext
+            return (AddCtx [decl, ModuleDef n term])
+              `Env.extendErr` [ DS "When checking the term",
+                                DD term,
+                                DS "against the type",
+                                DC decl
+                              ]
+      Right term' ->
+        Env.extendSourceLocation
+          (unPosFlaky term)
+          term
+          ( Env.err
+              [ DS "Multiple definitions of",
+                DC n,
+                DS "Previous definition was",
+                DD term'
+              ]
+          )
 tcEntry decl@(ModuleDecl x ty) = do
   duplicateTypeBindingCheck decl
   tcType ty Env.emptyContext
@@ -668,8 +670,10 @@ tcEntry decl@(ModuleData n (DataDef (delta :: Telescope n Z) s cs)) = do
                           DC decl
                         ]
 tcEntry (ModuleFail failing) = do
-  r <- (False <$ tcEntry failing) `catchError` \_ -> return True
-  if r then return $ AddCtx [] else Env.err [DS "Statement", DC failing, DS "should fail to typecheck, but succeeded."]
+  r <- Env.ensureError (tcEntry failing)
+  case r of
+    Left _ -> return $ AddCtx []
+    Right _ -> Env.err [DS "Statement", DC failing, DS "should fail to typecheck, but succeeded."]
 
 -- | Make sure that we don't have the same name twice in the
 -- environment. (We don't rename top-level module definitions.)

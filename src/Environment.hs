@@ -335,6 +335,9 @@ whenNothing x msg =
     Just r -> return r
     Nothing -> err msg
 
+ensureError :: TcMonad n a -> TcMonad n (Either Err a)
+ensureError c = (Right <$> c) `catchError` \err -> return $ Left err
+
 --------------------------------------------------------------
 -- Modules
 
