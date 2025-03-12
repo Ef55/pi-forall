@@ -6,7 +6,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 
 import Data.LocalName
-import PiForall.Syntax (ConstructorNames, ModuleImport(..))
+import Syntax (ConstructorNames, ModuleImport(..))
 
 -- | names of top level declarations/definitions
 -- must be unique

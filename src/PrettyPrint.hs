@@ -22,7 +22,7 @@ import AutoEnv.Bind.Pat (PatList(..))
 import qualified AutoEnv.Bind.Pat as Pat
 
 
-import PiForall.Syntax
+import Syntax
 
 import Data.List as List
 
