@@ -29,13 +29,17 @@ examples =
     "Examples"
     (tcFiles "pi" ["Equality", "Lennart", "List", "Vec"])
 
+baseTests :: TestTree
+baseTests = testGroup "Base tests" (tcFiles "test/base" ["Fail"])
+
 main :: IO ()
 main = do
   defaultMain $
     testGroup
       "All"
       [ QC.testProperty "PP-Parsing round trip" prop_roundtrip,
-        examples
+        examples,
+        baseTests
       ]
 
 --------------------------------------------------------------------------------

@@ -667,6 +667,9 @@ tcEntry decl@(ModuleData n (DataDef (delta :: Telescope n Z) s cs)) = do
         `Env.extendErr` [ DS "when checking the datatype declaration",
                           DC decl
                         ]
+tcEntry (ModuleFail failing) = do
+  r <- (False <$ tcEntry failing) `catchError` \_ -> return True
+  if r then return $ AddCtx [] else Env.err [DS "Statement", DC failing, DS "should fail to typecheck, but succeeded."]
 
 -- | Make sure that we don't have the same name twice in the
 -- environment. (We don't rename top-level module definitions.)
