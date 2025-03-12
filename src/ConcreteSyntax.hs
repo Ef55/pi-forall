@@ -1,12 +1,11 @@
 module ConcreteSyntax where
 
-import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
+import Data.LocalName
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
-
-import Data.LocalName
-import Syntax (ConstructorNames, ModuleImport(..))
+import Syntax (ConstructorNames, ModuleImport (..))
+import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
 
 -- | names of top level declarations/definitions
 -- must be unique
@@ -39,7 +38,7 @@ data Term
   | Contra Term
   | TrustMe
   | PrintMe
-     deriving (Eq, Show)
+  deriving (Eq, Show)
 
 -- | Patterns (without embedded type annotations)
 -- `p` is the number of variables bound by the pattern
@@ -48,18 +47,18 @@ data Term
 data Pattern where
   PatCon :: DataConName -> [Pattern] -> Pattern
   PatVar :: LocalName -> Pattern
-    deriving (Eq, Show)
+  deriving (Eq, Show)
 
 -- A single branch in a match expression. Binds a pattern
 -- with expression variables, with an expression body
 data Match
   = Branch Pattern Term
-     deriving (Eq, Show)
+  deriving (Eq, Show)
 
 -- | Local assumption
 data Entry where
   EntryDecl :: LocalName -> Typ -> Entry -- binding assumption
-  EntryDef  :: LocalName -> Term -> Entry -- nonbinding assumption
+  EntryDef :: LocalName -> Term -> Entry -- nonbinding assumption
 
 -- Telescopes: snoc-lists of variable assumptions x1:A1, x2:A2, ....,xp:Ap
 -- That are used as typing contexts
@@ -73,28 +72,25 @@ t <:> e = t ++ [e]
 
 -- | Toplevel components of modules
 data ModuleEntry
-  = ModuleDecl { declName :: GlobalName, declType :: Typ }
-  | ModuleDef  { declName :: GlobalName, declTerm :: Term }
-  | ModuleData { declName :: GlobalName, declData :: DataDef }
+  = ModuleDecl {declName :: GlobalName, declType :: Typ}
+  | ModuleDef {declName :: GlobalName, declTerm :: Term}
+  | ModuleData {declName :: GlobalName, declData :: DataDef}
 
 -- | Datatype definitions
-data DataDef =
-  DataDef
-  {
-    data_params :: Telescope,
+data DataDef = DataDef
+  { data_params :: Telescope,
     data_sort :: Typ,
     data_constructors :: [ConstructorDef]
   }
 
-data ConstructorDef =
-  ConstructorDef
+data ConstructorDef = ConstructorDef
   { con_pos :: SourcePos,
     con_name :: DataConName,
     con_arguments :: Telescope
   }
 
-newtype ScopedConstructorDef =
-  ScopedConstructorDef (Telescope, ConstructorDef)
+newtype ScopedConstructorDef
+  = ScopedConstructorDef (Telescope, ConstructorDef)
 
 ------------------------------------------------------------------
 
@@ -111,7 +107,6 @@ data Module = Module
   }
 
 -------------------------------------------------------
-
 
 -- * Definitions related to datatypes
 
@@ -141,6 +136,3 @@ unPos _ = Nothing
 -- | Tries to find a Pos inside a term, otherwise just gives up.
 unPosFlaky :: Term -> SourcePos
 unPosFlaky t = Maybe.fromMaybe (newPos "unknown location" 0 0) (unPos t)
-
-
-

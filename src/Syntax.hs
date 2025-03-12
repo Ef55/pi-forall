@@ -5,22 +5,17 @@
 module Syntax where
 
 import AutoEnv
-
-import qualified AutoEnv.Bind.Single as B
-import qualified AutoEnv.Bind.Pat as Pat
-import AutoEnv.Bind.Scoped (TeleList(..),(<:>))
-import qualified AutoEnv.Bind.Scoped as Scoped
-import qualified AutoEnv.Bind.Local as Local
-
+import AutoEnv.Bind.Local qualified as Local
+import AutoEnv.Bind.Pat qualified as Pat
+import AutoEnv.Bind.Scoped (TeleList (..), (<:>))
+import AutoEnv.Bind.Scoped qualified as Scoped
+import AutoEnv.Bind.Single qualified as B
 import AutoEnv.MonadScoped
-
-import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
+import Data.FinAux
 import Data.Maybe qualified as Maybe
 import Data.Set qualified as Set
 import Data.Vec qualified as Vec
-import Data.FinAux
-
-
+import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- inScope :: Scope LocalName n -> (SNatI n => a) -> a
@@ -69,14 +64,14 @@ data Term (n :: Nat)
 -- | Patterns (without embedded type annotations)
 -- `p` is the number of variables bound by the pattern
 -- LocalName is used for printing only, irrelevant for alpha-equivalence
-data Pattern (p :: Nat)  where
+data Pattern (p :: Nat) where
   PatCon :: DataConName -> Pat.PatList Pattern p -> Pattern p
   PatVar :: LocalName -> Pattern N1
 
 -- A single branch in a match expression. Binds a pattern
 -- with expression variables, with an expression body
 data Match (n :: Nat)
-  = forall p. SNatI p => Branch (Pat.Bind Term Term (Pattern p) n)
+  = forall p. (SNatI p) => Branch (Pat.Bind Term Term (Pattern p) n)
 
 ----------------------------------------------------------
 -- Datatype and constructor declarations
@@ -85,19 +80,17 @@ data Match (n :: Nat)
 -- | Local assumption, either declarations of local variables or definitions (i.e. constraints on variables already in scope)
 data Local p n where
   LocalDecl :: LocalName -> Typ n -> Local N1 n -- binding assumption
-  LocalDef  :: Fin n -> Term n -> Local N0 n -- nonbinding assumption
+  LocalDef :: Fin n -> Term n -> Local N0 n -- nonbinding assumption
 
 type Telescope = Scoped.TeleList Local
 
 -- | Datatype definitions
 data DataDef = forall n.
   DataDef
-  {
-    data_delta :: Telescope n Z,
+  { data_delta :: Telescope n Z,
     data_sort :: Typ Z,
     data_constructors :: [ConstructorDef n]
   }
-
 
 -- | Data constructor definitions, in the scope of the parameters
 -- of the datatype
@@ -108,8 +101,9 @@ data ConstructorDef n = forall m.
   }
 
 -- A data constructor paired with the telescope of its data type
-data ScopedConstructorDef = forall n.
-  ScopedConstructorDef (Telescope n Z) (ConstructorDef n)
+data ScopedConstructorDef
+  = forall n.
+    ScopedConstructorDef (Telescope n Z) (ConstructorDef n)
 
 -- | The names of all type/data constructors used in the module
 data ConstructorNames = ConstructorNames
@@ -119,9 +113,9 @@ data ConstructorNames = ConstructorNames
 
 -- Toplevel components of modules
 data ModuleEntry
-  = ModuleDecl { declName :: GlobalName, declType :: Typ Z }
-  | ModuleDef  { declName :: GlobalName, declTerm :: Term Z }
-  | ModuleData { declName :: GlobalName, declData :: DataDef }
+  = ModuleDecl {declName :: GlobalName, declType :: Typ Z}
+  | ModuleDef {declName :: GlobalName, declTerm :: Term Z}
+  | ModuleData {declName :: GlobalName, declData :: DataDef}
 
 -- | module names
 type ModuleName = String
@@ -212,8 +206,6 @@ instance (forall p1 p2. PatEq (pat p1) (pat p2)) =>
 -}
 ------------------------------------------------------
 
-
-
 ----------------------------------------------
 --  Sized/Named instances
 ----------------------------------------------
@@ -221,9 +213,9 @@ instance (forall p1 p2. PatEq (pat p1) (pat p2)) =>
 -- simple patterns
 
 instance Sized (Pattern p) where
-    type Size (Pattern p) = p
-    size (PatCon _ p) = size p
-    size (PatVar _) = s1
+  type Size (Pattern p) = p
+  size (PatCon _ p) = size p
+  size (PatVar _) = s1
 
 instance Named LocalName (Pattern p) where
   patLocals :: Pattern p -> Vec p LocalName
@@ -233,19 +225,18 @@ instance Named LocalName (Pattern p) where
 -- scoped patterns
 
 instance Sized (Local p n) where
-    type Size (Local p n) = p
-    size (LocalDecl _ _) = s1
-    size (LocalDef _ _) = s0
+  type Size (Local p n) = p
+  size (LocalDecl _ _) = s1
+  size (LocalDef _ _) = s0
 
 instance Scoped.ScopedSized (Local p) where
-    type ScopedSize (Local p) = p
+  type ScopedSize (Local p) = p
 
 instance Scoped.IScopedSized Local
 
 instance Named LocalName (Local p n) where
   patLocals (LocalDecl x _) = x ::: VNil
   patLocals (LocalDef _ _) = VNil
-
 
 ----------------------------------------------
 --  Subst instances
@@ -388,8 +379,8 @@ instance Strengthen Term where
   strengthenRec k m n PrintMe = pure PrintMe
 
 instance Strengthen Match where
-
   strengthenRec k m n (Branch bnd) = Branch <$> strengthenRec k m n bnd
+
 --------------------------------------------------------
 -- Alpha equivalence (Eq type class)
 --------------------------------------------------------
@@ -406,8 +397,8 @@ instance Eq (Term n) where
   TyCon n1 a1 == TyCon n2 a2 = n1 == n2 && a1 == a2
   DataCon n1 a1 == DataCon n2 a2 = n1 == n2 && a1 == a2
   Case a1 b1 == Case a2 b2 = a1 == a2 && b1 == b2
-  App a1 b1 == App a2 b2 =  a1 == a2 && b1 == b2
-  Ann a1 b1 == Ann a2 b2 =  a1 == a2 && b1 == b2
+  App a1 b1 == App a2 b2 = a1 == a2 && b1 == b2
+  Ann a1 b1 == Ann a2 b2 = a1 == a2 && b1 == b2
   TyEq a1 b1 == TyEq a2 b2 = a1 == a2 && b1 == b2
   Subst a1 b1 == Subst a2 b2 = a1 == a2 && b1 == b2
   TmRefl == TmRefl = True
@@ -415,20 +406,23 @@ instance Eq (Term n) where
   _ == _ = False
 
 instance PatEq (Pattern p1) (Pattern p2) where
-  patEq :: Pattern p1 -> Pattern p2 ->
-     Maybe (Size (Pattern p1) :~: Size (Pattern p2))
+  patEq ::
+    Pattern p1 ->
+    Pattern p2 ->
+    Maybe (Size (Pattern p1) :~: Size (Pattern p2))
   -- ignore local names
   patEq (PatVar _) (PatVar _) = Just Refl
-  patEq (PatCon s1 ps1) (PatCon s2 ps2) | s1 == s2 =
-    patEq ps1 ps2
+  patEq (PatCon s1 ps1) (PatCon s2 ps2)
+    | s1 == s2 =
+        patEq ps1 ps2
   patEq _ _ = Nothing
 
 instance Eq (Match n) where
   (Branch p1) == (Branch p2) =
-      case patEq (Pat.getPat p1) (Pat.getPat p2) of
-         Just Refl ->
-            Pat.getBody p1 == Pat.getBody p2
-         Nothing -> False
+    case patEq (Pat.getPat p1) (Pat.getPat p2) of
+      Just Refl ->
+        Pat.getBody p1 == Pat.getBody p2
+      Nothing -> False
 
 -- To compare pattern binders, we need to unbind, but also
 -- make sure that the patterns are equal
@@ -444,7 +438,6 @@ instance (Eq (Term n)) => Eq (Local.Bind Term Term n) where
 -- With the instance above the derivable equality instance
 -- is alpha-equivalence
 -- deriving instance (Eq (Term n))
-
 
 -------------------------------------------------------
 -- Prelude datatypes
@@ -475,31 +468,30 @@ reflCon =
 sigmaDef :: DataDef
 sigmaDef =
   DataDef
-  {
-    data_delta =
-      LocalDecl @N0 (LocalName "A") TyType <:>
-      LocalDecl @N1 (LocalName "B") (Pi (Var f0) (Local.bind (LocalName "x") TyType)) <:> TNil,
-    data_sort = TyType,
-    data_constructors = [prodCon]
-  }
+    { data_delta =
+        LocalDecl @N0 (LocalName "A") TyType
+          <:> LocalDecl @N1 (LocalName "B") (Pi (Var f0) (Local.bind (LocalName "x") TyType))
+          <:> TNil,
+      data_sort = TyType,
+      data_constructors = [prodCon]
+    }
 
 prodCon :: ConstructorDef N2
 prodCon =
   ConstructorDef
-  { con_name = "Prod",
-    con_theta =
-    LocalDecl (LocalName "a") (Var f1)
-    <:> LocalDecl (LocalName "b")
-         (App (Var f1) (Var f0))
-    <:> TNil
-  }
-
+    { con_name = "Prod",
+      con_theta =
+        LocalDecl (LocalName "a") (Var f1)
+          <:> LocalDecl
+            (LocalName "b")
+            (App (Var f1) (Var f0))
+          <:> TNil
+    }
 
 unitDef :: DataDef
 unitDef =
   DataDef
-    {
-      data_delta = TNil,
+    { data_delta = TNil,
       data_sort = TyType,
       data_constructors = [unitCon]
     }
@@ -514,8 +506,7 @@ unitCon =
 boolDef :: DataDef
 boolDef =
   DataDef
-    {
-      data_delta = TNil,
+    { data_delta = TNil,
       data_sort = TyType,
       data_constructors = [boolCon False, boolCon True]
     }
@@ -526,9 +517,8 @@ boolCon b = ConstructorDef {con_name = show b, con_theta = TNil}
 eitherDef :: DataDef
 eitherDef =
   DataDef
-    {
-      data_delta =
-          LocalDecl (LocalName "A") TyType
+    { data_delta =
+        LocalDecl (LocalName "A") TyType
           <:> LocalDecl (LocalName "B") TyType
           <:> TNil,
       data_sort = TyType,
@@ -538,47 +528,47 @@ eitherDef =
 eitherLeft :: ConstructorDef N2
 eitherLeft =
   ConstructorDef
-    {
-      con_name = "Left",
+    { con_name = "Left",
       con_theta = LocalDecl (LocalName "a") (Var f0) <:> TNil
     }
 
 eitherRight :: ConstructorDef N2
 eitherRight =
   ConstructorDef
-    {
-      con_name = "Right",
+    { con_name = "Right",
       con_theta =
         LocalDecl (LocalName "b") (Var f1) <:> TNil
     }
 
 prelude :: [ModuleEntry]
-prelude = [ModuleData "Unit" unitDef,
-           ModuleData "Bool" boolDef,
-           ModuleData "Either" eitherDef,
-           ModuleData "Sigma" sigmaDef]
-
+prelude =
+  [ ModuleData "Unit" unitDef,
+    ModuleData "Bool" boolDef,
+    ModuleData "Either" eitherDef,
+    ModuleData "Sigma" sigmaDef
+  ]
 
 initialConstructorNames :: ConstructorNames
 initialConstructorNames =
-  foldr g (ConstructorNames Set.empty Set.empty) prelude where
+  foldr g (ConstructorNames Set.empty Set.empty) prelude
+  where
     g (ModuleData dn (DataDef _ _ dc)) cn =
-      ConstructorNames {
-        tconNames = Set.insert dn(tconNames cn),
-        dconNames = Set.union (Set.fromList (map con_name dc)) (dconNames cn)
-      }
+      ConstructorNames
+        { tconNames = Set.insert dn (tconNames cn),
+          dconNames = Set.union (Set.fromList (map con_name dc)) (dconNames cn)
+        }
     g _ cn = cn
-
-
-
 
 --------------------------------------------------------
 -- Show instances
 --------------------------------------------------------
 
 deriving instance (Show (Term n))
+
 deriving instance (Show (Match n))
+
 deriving instance (Show (Pattern p))
+
 deriving instance (Show (Pat.PatList Pattern p))
 
 instance Show (Pat.Bind Term Term (Pattern p) n) where

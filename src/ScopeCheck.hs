@@ -4,48 +4,50 @@
 -- Stability   : experimental
 --
 -- This module demonstrates a translation from unscoped to well-scoped terms
-
 module ScopeCheck where
 
-
-import qualified AutoEnv.Bind.Single as B
-import AutoEnv.Bind.Pat (PatList(..))
-import qualified AutoEnv.Bind.Pat as Pat
+import AutoEnv.Bind.Local qualified as L
+import AutoEnv.Bind.Pat (PatList (..))
+import AutoEnv.Bind.Pat qualified as Pat
 import AutoEnv.Bind.Scoped ((<:>))
-import qualified AutoEnv.Bind.Scoped as Scoped
-import qualified AutoEnv.Bind.Local as L
-import Data.Maybe (fromJust)
-import qualified ConcreteSyntax as C
-import qualified Syntax as S
+import AutoEnv.Bind.Scoped qualified as Scoped
+import AutoEnv.Bind.Single qualified as B
 import AutoEnv.Lib
-
+import ConcreteSyntax qualified as C
+import Data.Maybe (fromJust)
+import Syntax qualified as S
 
 push :: a -> [(a, Fin n)] -> [(a, Fin (S n))]
 push x vs = (x, FZ) : map (fmap FS) vs
 
-data ScopedPattern n = forall p. SNatI p =>
-   ScopedPattern (S.Pattern p) [(LocalName, Fin (p + n))]
+data ScopedPattern n
+  = forall p.
+    (SNatI p) =>
+    ScopedPattern (S.Pattern p) [(LocalName, Fin (p + n))]
 
-data ScopedPatList n = forall p. SNatI p =>
-   ScopedPatList (Pat.PatList S.Pattern p) [(LocalName, Fin (p + n))]
+data ScopedPatList n
+  = forall p.
+    (SNatI p) =>
+    ScopedPatList (Pat.PatList S.Pattern p) [(LocalName, Fin (p + n))]
 
 scopeCheckModule :: C.Module -> Maybe S.Module
 scopeCheckModule m = do
   entries <- mapM scopeCheckEntry (C.moduleEntries m)
-  return $ S.Module {
-              S.moduleName = C.moduleName m,
-              S.moduleImports = C.moduleImports m,
-              S.moduleEntries = entries,
-              S.moduleConstructors = C.moduleConstructors m
-            }
+  return $
+    S.Module
+      { S.moduleName = C.moduleName m,
+        S.moduleImports = C.moduleImports m,
+        S.moduleEntries = entries,
+        S.moduleConstructors = C.moduleConstructors m
+      }
 
 scopeCheckEntry :: C.ModuleEntry -> Maybe S.ModuleEntry
 scopeCheckEntry (C.ModuleDecl gn ty) = S.ModuleDecl gn <$> scopeCheck ty
 scopeCheckEntry (C.ModuleDef gn tm) = S.ModuleDef gn <$> scopeCheck tm
 scopeCheckEntry (C.ModuleData dn datadef) = S.ModuleData dn <$> scopeCheckData datadef
 
-data ScopedTele n =
-  forall p. SNatI p => ScopedTele [(LocalName, Fin (p + n))] (S.Telescope p n)
+data ScopedTele n
+  = forall p. (SNatI p) => ScopedTele [(LocalName, Fin (p + n))] (S.Telescope p n)
 
 scopeCheckData :: C.DataDef -> Maybe S.DataDef
 scopeCheckData (C.DataDef delta s cs) = do
@@ -53,19 +55,22 @@ scopeCheckData (C.DataDef delta s cs) = do
   case axiomPlusZ @n of
     Refl -> S.DataDef delta' <$> scopeCheck s <*> mapM (scopeCheckConstructor scope) cs
 
-scopeCheckTele :: forall n. SNatI n => [(LocalName, Fin n)] -> C.Telescope -> Maybe (ScopedTele n)
+scopeCheckTele :: forall n. (SNatI n) => [(LocalName, Fin n)] -> C.Telescope -> Maybe (ScopedTele n)
 scopeCheckTele scope [] = Just $ ScopedTele scope Scoped.TNil
 scopeCheckTele scope (C.EntryDecl n ty : entries) = do
   ty' <- to scope ty
   let scope' :: [(LocalName, Fin (S n))]
       scope' = push n scope
-  ScopedTele (ss    :: [(LocalName, Fin (p + 'S n))])
-             (tele' :: S.Telescope p (S n)) <- scopeCheckTele scope' entries
+  ScopedTele
+    (ss :: [(LocalName, Fin (p + 'S n))])
+    (tele' :: S.Telescope p (S n)) <-
+    scopeCheckTele scope' entries
   let fact :: p + S n :~: (p + N1) + n
       fact = axiomAssoc @p @N1 @n
-  withSNat (sPlus (snat @p) s1) $ case fact of { Refl -> do
-    let ret = S.LocalDecl n ty' <:> tele'
-    return $ ScopedTele ss ret }
+  withSNat (sPlus (snat @p) s1) $ case fact of
+    Refl -> do
+      let ret = S.LocalDecl n ty' <:> tele'
+      return $ ScopedTele ss ret
 scopeCheckTele scope (C.EntryDef n tm : entries) = do
   tm' <- to scope tm
   ScopedTele ss (tele' :: S.Telescope p n) <- scopeCheckTele scope entries
@@ -75,8 +80,11 @@ scopeCheckTele scope (C.EntryDef n tm : entries) = do
       let ret = S.LocalDef ln tm' <:> tele'
       return $ ScopedTele ss ret
 
-scopeCheckConstructor :: SNatI n => [(LocalName, Fin n)] -> C.ConstructorDef
-  -> Maybe (S.ConstructorDef n)
+scopeCheckConstructor ::
+  (SNatI n) =>
+  [(LocalName, Fin n)] ->
+  C.ConstructorDef ->
+  Maybe (S.ConstructorDef n)
 scopeCheckConstructor scope (C.ConstructorDef p dc theta) = do
   ScopedTele _ theta' <- scopeCheckTele scope theta
   pure $ S.ConstructorDef dc theta'
@@ -86,38 +94,48 @@ scopeCheckConstructor scope (C.ConstructorDef p dc theta) = do
 scopeCheck :: C.Term -> Maybe (S.Term Z)
 scopeCheck = to []
 
-toM :: forall n. SNatI n => [(LocalName, Fin n)] -> C.Match ->
+toM ::
+  forall n.
+  (SNatI n) =>
+  [(LocalName, Fin n)] ->
+  C.Match ->
   Maybe (S.Match n)
 toM vs (C.Branch pat tm) = do
   ScopedPattern (pat' :: S.Pattern p) vs' <- toP vs pat
   tm' <- withSNat (sPlus (snat :: SNat p) (snat :: SNat n)) $ to vs' tm
   return (S.Branch (Pat.bind pat' tm'))
 
-toP :: SNatI n => [(LocalName, Fin n)] ->
-  C.Pattern -> Maybe (ScopedPattern n)
+toP ::
+  (SNatI n) =>
+  [(LocalName, Fin n)] ->
+  C.Pattern ->
+  Maybe (ScopedPattern n)
 toP vs (C.PatVar x) =
-  return (ScopedPattern (S.PatVar x) ((x, FZ): map (fmap FS) vs))
+  return (ScopedPattern (S.PatVar x) ((x, FZ) : map (fmap FS) vs))
 toP vs (C.PatCon n pats) = do
   ScopedPatList pats' vs' <- toPL vs pats
   return (ScopedPattern (S.PatCon n pats') vs')
 
-toPL :: forall n. SNatI n => [(LocalName, Fin n)] ->
-  [C.Pattern] -> Maybe (ScopedPatList n)
+toPL ::
+  forall n.
+  (SNatI n) =>
+  [(LocalName, Fin n)] ->
+  [C.Pattern] ->
+  Maybe (ScopedPatList n)
 toPL vs [] = return $ ScopedPatList Pat.PNil vs
-toPL vs (p :ps) = do
-  ScopedPattern (p'  :: S.Pattern p) vs' <- toP vs p
+toPL vs (p : ps) = do
+  ScopedPattern (p' :: S.Pattern p) vs' <- toP vs p
   withSNat (sPlus (snat :: SNat p) (snat :: SNat n)) $ do
-      ScopedPatList (ps' :: Pat.PatList S.Pattern p1) vs'' <-
+    ScopedPatList (ps' :: Pat.PatList S.Pattern p1) vs'' <-
+      toPL vs' ps
+    Refl <- Just (axiomAssoc @p1 @p @n)
+    withSNat (sPlus (snat :: SNat p1) (snat :: SNat p)) (return $ ScopedPatList (Pat.PCons p' ps') vs'')
 
-          toPL vs' ps
-      Refl <- Just (axiomAssoc @p1 @p @n)
-      withSNat (sPlus (snat :: SNat p1) (snat :: SNat p)) (return $ ScopedPatList (Pat.PCons p' ps') vs'')
-
-to :: SNatI n => [(LocalName, Fin n)] -> C.Term -> Maybe (S.Term n)
+to :: (SNatI n) => [(LocalName, Fin n)] -> C.Term -> Maybe (S.Term n)
 to vs C.TyType = return S.TyType
 to vs (C.Var v) = case lookup v vs of
-                    Just x -> Just $ S.Var x
-                    Nothing -> Just $ S.Global y where LocalName y = v
+  Just x -> Just $ S.Var x
+  Nothing -> Just $ S.Global y where LocalName y = v
 to vs (C.Global x) = return (S.Global x)
 to vs (C.Pi a x b) = do
   a' <- to vs a

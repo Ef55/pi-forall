@@ -23,11 +23,11 @@ import Data.Foldable (toList)
 import Data.List
 import Data.List qualified as List
 import Data.Maybe (listToMaybe)
+import Log
 import PrettyPrint
 import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
 import Syntax
 import Text.ParserCombinators.Parsec.Pos (SourcePos)
-import Log
 
 -------------------------------------------------------
 
