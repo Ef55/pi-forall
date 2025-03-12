@@ -12,11 +12,11 @@ module Parser
 
 import Data.LocalName
 
-import PiForall.ConcreteSyntax hiding (moduleImports,ModuleImport)
-import PiForall.Syntax (ConstructorNames(..), initialConstructorNames, ModuleImport(..))
-import qualified PiForall.Syntax as Syntax
+import ConcreteSyntax hiding (moduleImports,ModuleImport)
+import Syntax (ConstructorNames(..), initialConstructorNames, ModuleImport(..))
+import qualified Syntax as Syntax
 
-import qualified PiForall.LayoutToken as Token
+import qualified LayoutToken as Token
 
 import Text.Parsec hiding (State,Empty)
 import Text.Parsec.Expr(Operator(..),Assoc(..),buildExpressionParser)
@@ -125,7 +125,6 @@ liftError (Right a) = return a
 parseModuleFile :: (MonadError ParseError m, MonadIO m) =>
    Syntax.ConstructorNames -> String -> m Module
 parseModuleFile cnames name = do
-  liftIO $ putStrLn $ "Parsing File " ++ show name
   contents <- liftIO $ readFile name
   liftError $
     evalState (runParserT (do { whiteSpace; v <- moduleDef;eof; return v}) [] name contents) cnames

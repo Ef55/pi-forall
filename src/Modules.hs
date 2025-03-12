@@ -3,13 +3,13 @@
 -- | Tools for working with multiple source files
 module Modules(getModules, ModuleInfo(..)) where
 
-import PiForall.Syntax
-import PiForall.ConcreteSyntax qualified as C
-import PiForall.Parser
-import PiForall.PrettyPrint
-import PiForall.TypeCheck
-import PiForall.ScopeCheck
-import PiForall.Environment
+import Syntax
+import ConcreteSyntax qualified as C
+import Parser
+import PrettyPrint
+import TypeCheck
+import ScopeCheck
+import Environment
 
 import Text.ParserCombinators.Parsec.Error ( ParseError, errorPos )
 
@@ -114,7 +114,8 @@ go str = do
         Just term' -> do
           putStrLn $ "parsed and scope checked as"
           putStrLn $ pp term'
-          res <- runTcMonad (inferType term' emptyContext)
+          let (res, logs) = runTcMonad (inferType term' emptyContext)
+          mapM_ (putStr . show) logs
           case res of
             Left typeError -> putTypeError (displayErr typeError initDI)
             Right ty -> do
@@ -143,7 +144,8 @@ goFilename pathToMainFile = do
   v <- runExceptT (getModules prefixes name)
   val <- v `exitWith` putParseError
   putStrLn "type checking..."
-  d <- runTcMonad (tcModules val)
+  let (d, logs) = runTcMonad (tcModules val)
+  mapM_ (putStr . show) logs
   defs <- d `exitWith` (putTypeError . flip displayErr initDI)
   putStrLn $ pp (last defs)
 

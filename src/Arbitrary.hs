@@ -13,11 +13,11 @@ import Text.Parsec.Error ( ParseError )
 
 import Data.LocalName
 
-import PiForall.ConcreteSyntax
-import PiForall.Syntax (ConstructorNames(..))
-import PiForall.PrettyPrint
-import PiForall.Parser ( testParser, expr )
-import PiForall.ScopeCheck
+import ConcreteSyntax
+import Syntax (ConstructorNames(..))
+import PrettyPrint
+import Parser ( testParser, expr )
+import ScopeCheck
 
 
 -- | Round trip property: a given term prints then parses to the same term.
