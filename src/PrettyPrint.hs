@@ -1,30 +1,25 @@
 -- | A Pretty Printer.
 module PrettyPrint (Display (..), D (..), SourcePos, PP.Doc, pp, disp, debug, DispInfo, initDI, namesDI) where
 
-import Control.Monad.Reader (MonadReader (ask, local), asks)
-import Data.Set qualified as S
-import qualified Data.Map as Map
-
-import Text.ParserCombinators.Parsec.Error (ParseError)
-import Text.ParserCombinators.Parsec.Pos (SourcePos, sourceColumn, sourceLine, sourceName)
-import Prettyprinter (Doc, (<+>))
-import qualified Prettyprinter as PP
-
-import qualified Data.FinAux as Fin
-import AutoEnv.Lib
+import AutoEnv.Bind.Local as Local
+import AutoEnv.Bind.Pat (PatList (..))
+import AutoEnv.Bind.Pat qualified as Pat
+import AutoEnv.Bind.Scoped (TeleList (..))
+import AutoEnv.Bind.Scoped qualified as Scoped
 import AutoEnv.Classes
 import AutoEnv.Context
 import AutoEnv.Env
-import AutoEnv.Bind.Local as Local
-import AutoEnv.Bind.Scoped (TeleList(..))
-import qualified AutoEnv.Bind.Scoped as Scoped
-import AutoEnv.Bind.Pat (PatList(..))
-import qualified AutoEnv.Bind.Pat as Pat
-
-
-import Syntax
-
+import AutoEnv.Lib
+import Control.Monad.Reader (MonadReader (ask, local), asks)
+import Data.FinAux qualified as Fin
 import Data.List as List
+import Data.Map qualified as Map
+import Data.Set qualified as S
+import Prettyprinter (Doc, (<+>))
+import Prettyprinter qualified as PP
+import Syntax
+import Text.ParserCombinators.Parsec.Error (ParseError)
+import Text.ParserCombinators.Parsec.Pos (SourcePos, sourceColumn, sourceLine, sourceName)
 
 -------------------------------------------------------------------------
 
@@ -41,19 +36,21 @@ class Display d where
   display :: d -> DispInfo -> Doc e
 
 -- | Convenience entry point for the pretty printer
-pp :: Display d => d -> String
+pp :: (Display d) => d -> String
 pp p = show (display p initDI)
 
-disp :: Display d => d -> Doc e
+disp :: (Display d) => d -> Doc e
 disp x = display x initDI
 
 -- | For debugging
-debug :: Display d => d -> String
-debug p = show (display p debugDI) where
-    debugDI = initDI{showLongNames = True, showAnnots=True}
+debug :: (Display d) => d -> String
+debug p = show (display p debugDI)
+  where
+    debugDI = initDI {showLongNames = True, showAnnots = True}
 
 -- | The data structure for information about the display
-data DispInfo = forall n. DI
+data DispInfo = forall n.
+  DI
   { -- | should we show type annotations?
     showAnnots :: Bool,
     -- | names that have been used
@@ -66,24 +63,25 @@ data DispInfo = forall n. DI
     showLongNames :: Bool
   }
 
-
 -- | Scoped error message quoting
-data D n = DS String
-         | forall a. Display a => DC a  -- closed constant, not a string
-         | forall a. Display (a n) => DD (a n)  -- single displayable value
-         | forall a. Display (a n) => DL [a n]  -- list of displayable values
+data D n
+  = DS String
+  | forall a. (Display a) => DC a -- closed constant, not a string
+  | forall a. (Display (a n)) => DD (a n) -- single displayable value
+  | forall a. (Display (a n)) => DL [a n] -- list of displayable values
 
 initDI :: DispInfo
-initDI = DI { showAnnots = False,
-              dispAvoid = S.empty,
-              localNames = [],
-              prec = 0,
-              showLongNames = False
-            }
+initDI =
+  DI
+    { showAnnots = False,
+      dispAvoid = S.empty,
+      localNames = [],
+      prec = 0,
+      showLongNames = False
+    }
 
 namesDI :: [LocalName] -> DispInfo
-namesDI s = initDI { localNames = s }
-
+namesDI s = initDI {localNames = s}
 
 -------------------------------------------------------------------------
 
@@ -103,11 +101,12 @@ instance Display ParseError where
 
 instance Display SourcePos where
   display p di =
-    PP.pretty (sourceName p) PP.<> PP.colon PP.<> PP.pretty (sourceLine p)
+    PP.pretty (sourceName p)
+      PP.<> PP.colon
+      PP.<> PP.pretty (sourceLine p)
       PP.<> PP.colon
       PP.<> PP.pretty (sourceColumn p)
       PP.<> PP.colon
-
 
 ------------------------------------------------------------------------
 
@@ -115,19 +114,19 @@ instance Display SourcePos where
 
 -------------------------------------------------------------------------
 
-
 instance Display Module where
   display m = do
     dn <- display (moduleName m)
     di <- mapM display (moduleImports m)
     de <- mapM display (moduleEntries m)
-    pure $ PP.vcat $ [PP.pretty "module" <+> dn <+> PP.pretty "where"]
-                    ++ di ++ de
-
+    pure $
+      PP.vcat $
+        [PP.pretty "module" <+> dn <+> PP.pretty "where"]
+          ++ di
+          ++ de
 
 instance Display ModuleImport where
   display (ModuleImport i) = pure $ PP.pretty "import" <+> disp i
-
 
 instance Display [ModuleEntry] where
   display ds = do
@@ -149,16 +148,21 @@ instance Display ModuleEntry where
     pure $ PP.pretty "data" <+> dn <+> dd
 
 instance Display DataDef where
-    display (DataDef params sort constructors) = do
-        dp <- display params
-        ds <- display sort
-        dc <- mapM display constructors
-        pure $ PP.nest 2 (PP.vcat
-            (dp
+  display (DataDef params sort constructors) = do
+    dp <- display params
+    ds <- display sort
+    dc <- mapM display constructors
+    pure $
+      PP.nest
+        2
+        ( PP.vcat
+            ( dp
                 <+> PP.colon
                 <+> ds
                 <+> PP.pretty "where"
-             : dc ))
+                : dc
+            )
+        )
 
 instance Display (ConstructorDef n) where
   display (ConstructorDef c TNil) = do
@@ -169,14 +173,18 @@ instance Display (ConstructorDef n) where
     pure $ dc <+> PP.pretty "of" <+> dt
 
 instance Display (Telescope m n) where
-   display TNil = mempty
-   display (TCons (LocalDecl x tm) tele) = do
-    dtm   <- display tm
+  display TNil = mempty
+  display (TCons (LocalDecl x tm) tele) = do
+    dtm <- display tm
     dtele <- local (push x) (display tele)
-    return $ PP.parens (if x /= internalName then
-                    PP.pretty (show x) <+> PP.colon <+> dtm
-                else dtm) <+> dtele
-   display (TCons (LocalDef x tm) tele) = do
+    return $
+      PP.parens
+        ( if x /= internalName
+            then PP.pretty (show x) <+> PP.colon <+> dtm
+            else dtm
+        )
+        <+> dtele
+  display (TCons (LocalDef x tm) tele) = do
     dx <- display (Var x)
     dtm <- display tm
     dtele <- display tele
@@ -184,16 +192,17 @@ instance Display (Telescope m n) where
 
 instance Display (Refinement Term n) where
   display (Refinement r) di =
-    PP.sep (PP.punctuate PP.comma (map d (Map.toList r))) where
-      d (x,tm) = display (Var x) di <+> PP.pretty "=" <+> display tm di
+    PP.sep (PP.punctuate PP.comma (map d (Map.toList r)))
+    where
+      d (x, tm) = display (Var x) di <+> PP.pretty "=" <+> display tm di
 
 -- This is Context n
-instance SNatI m => Display (Env Term m n) where
+instance (SNatI m) => Display (Env Term m n) where
   display r di =
-    let t = tabulate r in
-    PP.sep (PP.punctuate PP.comma (map d t)) where
-      d (x,tm) = PP.pretty (show x) <+> PP.pretty "~>" <+> display tm di
-
+    let t = tabulate r
+     in PP.sep (PP.punctuate PP.comma (map d t))
+    where
+      d (x, tm) = PP.pretty (show x) <+> PP.pretty "~>" <+> display tm di
 
 -------------------------------------------------------------------------
 
@@ -201,25 +210,26 @@ instance SNatI m => Display (Env Term m n) where
 
 -------------------------------------------------------------------------
 
-
 displayMaybe :: (t -> DispInfo -> Doc d) -> Maybe t -> DispInfo -> Doc d
 displayMaybe display m di = case m of
   (Just a) -> PP.pretty "Just" <+> display a di
   Nothing -> PP.pretty "Nothing"
 
-instance Display a => Display (Maybe a) where
+instance (Display a) => Display (Maybe a) where
   display = displayMaybe display
 
-
-displayEither :: (Display a, Display b) =>
-    (forall a. Display a => a -> DispInfo -> Doc d) -> Either a b -> DispInfo -> Doc d
+displayEither ::
+  (Display a, Display b) =>
+  (forall a. (Display a) => a -> DispInfo -> Doc d) ->
+  Either a b ->
+  DispInfo ->
+  Doc d
 displayEither disp e di = case e of
-     (Left a) -> PP.pretty "Left" <+> disp a di
-     (Right a) -> PP.pretty "Right" <+> disp a di
+  (Left a) -> PP.pretty "Left" <+> disp a di
+  (Right a) -> PP.pretty "Right" <+> disp a di
 
 instance (Display a, Display b) => Display (Either a b) where
   display = displayEither display
-
 
 -------------------------------------------------------------------------
 
@@ -254,28 +264,35 @@ instance Display Bool where
 
 -------------------------------------------------------------------------
 
-
 levelApp :: Int
-levelApp     = 10
-levelIf :: Int
-levelIf      = 0
-levelLet :: Int
-levelLet     = 0
-levelCase :: Int
-levelCase    = 0
-levelLam :: Int
-levelLam     = 0
-levelPi :: Int
-levelPi      = 0
-levelSigma :: Int
-levelSigma   = 0
-levelProd :: Int
-levelProd    = 0
-levelArrow :: Int
-levelArrow   = 5
+levelApp = 10
 
-withPrec :: MonadReader DispInfo m => Int -> m a -> m a
-withPrec p = local (\d -> d { prec = p })
+levelIf :: Int
+levelIf = 0
+
+levelLet :: Int
+levelLet = 0
+
+levelCase :: Int
+levelCase = 0
+
+levelLam :: Int
+levelLam = 0
+
+levelPi :: Int
+levelPi = 0
+
+levelSigma :: Int
+levelSigma = 0
+
+levelProd :: Int
+levelProd = 0
+
+levelArrow :: Int
+levelArrow = 5
+
+withPrec :: (MonadReader DispInfo m) => Int -> m a -> m a
+withPrec p = local (\d -> d {prec = p})
 
 parens :: Bool -> Doc d -> Doc d
 parens b = if b then PP.parens else id
@@ -284,13 +301,13 @@ brackets :: Bool -> Doc d -> Doc d
 brackets b = if b then PP.brackets else id
 
 nthOpt :: [a] -> Int -> Maybe a
-nthOpt (x:xs) 0 = Just x
-nthOpt (x:xs) n = nthOpt xs (n - 1)
+nthOpt (x : xs) 0 = Just x
+nthOpt (x : xs) n = nthOpt xs (n - 1)
 nthOpt [] _ = Nothing
 
 instance Display (Term n) where
   display TyType = return $ PP.pretty "Type"
-  display (Global x) = return $ PP.pretty x   -- TODO
+  display (Global x) = return $ PP.pretty x -- TODO
   display (Var n) = do
     ln <- asks localNames
     case nthOpt ln (toInt n) of
@@ -303,47 +320,49 @@ instance Display (Term n) where
   display (App f x) = do
     n <- ask prec
     df <- withPrec levelApp (display f)
-    dx <- withPrec (levelApp+1) (display x)
+    dx <- withPrec (levelApp + 1) (display x)
     return $ parens (levelApp < n) $ df <+> dx
   display (Pi a bnd) = do
     Local.unbind bnd $ \(n, b) -> do
       p <- ask prec
       lhs <-
-            if Fin.f0 `appearsFree` b
-              then do
-                dn <- display n
-                da <- withPrec 0 (display a)
-                return $ PP.parens (dn <+> PP.colon <+> da)
-              else do
-                withPrec (levelArrow+1) (display a)
+        if Fin.f0 `appearsFree` b
+          then do
+            dn <- display n
+            da <- withPrec 0 (display a)
+            return $ PP.parens (dn <+> PP.colon <+> da)
+          else do
+            withPrec (levelArrow + 1) (display a)
       db <- local (push n) $ withPrec levelPi (display b)
       return $ parens (levelArrow < p) $ lhs <+> PP.pretty "->" <+> db
   display (Ann a b) = do
     sa <- ask showAnnots
-    if sa then do
-      da <- withPrec 0 (display a)
-      db <- withPrec 0 (display b)
-      return $ PP.parens (da <+> PP.pretty ":" <+> db)
+    if sa
+      then do
+        da <- withPrec 0 (display a)
+        db <- withPrec 0 (display b)
+        return $ PP.parens (da <+> PP.pretty ":" <+> db)
       else display a
-
   display (Pos _ e) = display e
-
   display (TyCon "(=)" [a, b]) = do
     da <- withPrec 0 (display a)
     db <- withPrec 0 (display b)
     return $ PP.parens (da <+> PP.pretty "=" <+> db)
-
   display (TyCon "Sigma" [tyA, Lam bnd]) =
     Local.unbind bnd $ \(x, tyB) -> do
-      if Fin.f0 `appearsFree` tyB then do
-        dx <- display x
-        dA <- withPrec 0 $ display tyA
-        dB <- local (push x) $ withPrec 0 $ display tyB
-        return $
-          PP.pretty "{" <+> dx <+> PP.pretty ":" <+> dA
-            <+> PP.pretty "|"
-            <+> dB
-            <+> PP.pretty "}"
+      if Fin.f0 `appearsFree` tyB
+        then do
+          dx <- display x
+          dA <- withPrec 0 $ display tyA
+          dB <- local (push x) $ withPrec 0 $ display tyB
+          return $
+            PP.pretty "{"
+              <+> dx
+              <+> PP.pretty ":"
+              <+> dA
+              <+> PP.pretty "|"
+              <+> dB
+              <+> PP.pretty "}"
         else do
           p <- ask prec
           dA <- withPrec levelSigma $ display tyA
@@ -362,48 +381,49 @@ instance Display (Term n) where
       db <- local (push x) $ display b
       return $
         parens (levelLet < p) $
-        PP.sep
-          [ PP.pretty "let" <+> dx
-              <+> PP.pretty "="
-              <+> da
-              <+> PP.pretty "in",
-            db
-          ]
-
+          PP.sep
+            [ PP.pretty "let"
+                <+> dx
+                <+> PP.pretty "="
+                <+> da
+                <+> PP.pretty "in",
+              db
+            ]
   display t
     | Just i <- isNumeral t = display i
   display (TyCon n args) = do
     p <- ask prec
     dn <- display n
-    dargs <- withPrec (levelApp+1) $ mapM display args
+    dargs <- withPrec (levelApp + 1) $ mapM display args
     return $
-      parens (levelApp < p && not (null args)) (PP.hsep (dn:dargs))
+      parens (levelApp < p && not (null args)) (PP.hsep (dn : dargs))
   display (DataCon n args) = do
     p <- ask prec
     dn <- display n
-    dargs <- withPrec (levelApp+1) $ mapM display args
+    dargs <- withPrec (levelApp + 1) $ mapM display args
     return $
-      parens (levelApp < p && not (null args)) (PP.hsep (dn:dargs))
+      parens (levelApp < p && not (null args)) (PP.hsep (dn : dargs))
   display (Case scrut alts) = do
     p <- asks prec
-    dscrut <- withPrec (levelCase+1) $ display scrut
+    dscrut <- withPrec (levelCase + 1) $ display scrut
     dalts <- withPrec 0 $ mapM display alts
     return $
-      parens (levelCase < p) $ prettyCase dscrut dalts
+      parens (levelCase < p) $
+        prettyCase dscrut dalts
   display (Subst a b) = do
     p <- asks prec
     da <- withPrec 0 $ display a
     db <- withPrec 0 $ display b
     return $
       parens (levelPi < p) $
-      PP.sep
-        [ PP.pretty "subst" <+> da,
-          PP.pretty "by" <+> db
-        ]
+        PP.sep
+          [ PP.pretty "subst" <+> da,
+            PP.pretty "by" <+> db
+          ]
   display (TyEq a b) = do
     p <- ask prec
-    da <- withPrec (levelApp+1) $ display a
-    db <- withPrec (levelApp+1) $ display b
+    da <- withPrec (levelApp + 1) $ display a
+    db <- withPrec (levelApp + 1) $ display b
     return $ PP.parens $ (da <+> PP.pretty "=" <+> db)
   display TmRefl = do
     return $ PP.pretty "Refl"
@@ -413,18 +433,23 @@ instance Display (Term n) where
     return $ parens (levelPi < p) $ PP.pretty "contra" <+> dty
   display TrustMe = return $ PP.pretty "TRUSTME"
   display PrintMe = return $ PP.pretty "PRINTME"
-open        = PP.flatAlt PP.emptyDoc (PP.pretty "{ ")
-close       = PP.flatAlt PP.emptyDoc (PP.pretty  " }")
-separator   = PP.flatAlt PP.emptyDoc (PP.pretty "; ")
+
+open = PP.flatAlt PP.emptyDoc (PP.pretty "{ ")
+
+close = PP.flatAlt PP.emptyDoc (PP.pretty " }")
+
+separator = PP.flatAlt PP.emptyDoc (PP.pretty "; ")
+
 prettyCase :: Doc ann -> [Doc ann] -> Doc ann
 prettyCase scrut xs =
-  let top =  PP.pretty "case" <+> scrut <+> PP.pretty "of" in
-  if null xs then top <+> PP.pretty "{ }" else
-    -- PP.nest 2 (top <> PP.line <> PP.encloseSep open close separator xs)
-    PP.nest 2 (top <> PP.hardline <> PP.vsep xs)
+  let top = PP.pretty "case" <+> scrut <+> PP.pretty "of"
+   in if null xs
+        then top <+> PP.pretty "{ }"
+        else -- PP.nest 2 (top <> PP.line <> PP.encloseSep open close separator xs)
+          PP.nest 2 (top <> PP.hardline <> PP.vsep xs)
+
 --  PP.group (PP.pretty "case" <+> scrut <+> PP.pretty "of" <+>
 --            PP.align (PP.encloseSep open close separator xs))
-
 
 instance Display (Match n) where
   display (Branch bd) = do
@@ -432,8 +457,6 @@ instance Display (Match n) where
     dpat <- display pat
     dubd <- local (pushList (binders pat)) $ display (Pat.getBody bd)
     return $ dpat <+> PP.pretty "->" <+> PP.align dubd
-
-
 
 binders :: Pattern p1 -> [LocalName]
 binders (PatVar x) = [x]
@@ -444,20 +467,19 @@ bindersList PNil = []
 bindersList (PCons p ps) = binders p ++ bindersList ps
 
 instance Display (Pattern p) where
-  display (PatCon c PNil)   = display c
+  display (PatCon c PNil) = display c
   display (PatCon c args) = do
     p <- ask prec
     dc <- display c
-    dargs <- withPrec (levelApp+1) $ display args
+    dargs <- withPrec (levelApp + 1) $ display args
     return $
-       parens (levelApp < p && nonnil args)
-         (PP.hsep [dc,dargs])
-      where
-        nonnil :: PatList Pattern p -> Bool
-        nonnil PNil = False
-        nonnil (PCons _ _) = True
-
-
+      parens
+        (levelApp < p && nonnil args)
+        (PP.hsep [dc, dargs])
+    where
+      nonnil :: PatList Pattern p -> Bool
+      nonnil PNil = False
+      nonnil (PCons _ _) = True
   display (PatVar x) = display x
 
 instance Display (PatList Pattern p) where
@@ -477,7 +499,7 @@ instance Display LocalName where
 -------------------------------------------------------------------------
 
 push :: LocalName -> DispInfo -> DispInfo
-push n r = r { localNames = n:localNames r}
+push n r = r {localNames = n : localNames r}
 
 pushList :: [LocalName] -> DispInfo -> DispInfo
 pushList ns r = foldl (flip push) r ns
@@ -491,5 +513,3 @@ gatherBinders (Lam b) =
 gatherBinders body = do
   db <- display body
   return ([], db)
-
-

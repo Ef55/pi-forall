@@ -1,7 +1,7 @@
-module Log (Log(..), isInfo) where
+module Log (Log (..), isInfo) where
 
-import qualified Data.List as List
 import Control.Monad.Writer (MonadWriter (tell))
+import Data.List qualified as List
 
 data Log
   = Info String
