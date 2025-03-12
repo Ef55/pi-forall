@@ -1,0 +1,74 @@
+cabal-version:  2.2
+name:           pi-forall
+version:        0.3
+license:        MIT
+license-file:   LICENSE
+copyright:      (c) 2013-2025 University of Pennsylvania
+description:    An implementation of a simple dependently typed language
+author:         Noe De Santo <ndesanto@seas.upenn.edu>, Stephanie Weirich <sweirich@seas.upenn.edu>, based on code by Trellys Team <trellys@...>
+maintainer:     Noe De Santo <ndesanto@seas.upenn.edu>, Stephanie Weirich <sweirich@seas.upenn.edu>
+build-type:     Simple
+tested-with:    GHC == 9.6.6
+category:       Compilers/Interpreters
+homepage:       https://github.com/Ef55/pi-forall
+synopsis:       Demo implementation of typechecker for dependently-typed language
+
+source-repository head
+  type: git
+  location: https://github.com/Ef55/pi-forall
+
+common common-stanza
+  ghc-options:
+     -Wno-type-defaults
+     -fwarn-incomplete-patterns
+  build-depends:
+      base >=4.15
+    , autoenv
+    , QuickCheck
+    , containers
+    , filepath
+    , parsec
+    , prettyprinter
+    , network
+    , directory
+    , random
+    , mtl
+    , brick
+    , vty
+    , fin >= 0.3.2
+    , vec
+  default-language:
+    GHC2021
+  default-extensions:
+    KindSignatures
+    , DataKinds
+    , GADTs
+    , StandaloneDeriving
+    , LambdaCase
+    , QuantifiedConstraints
+    , TypeFamilies
+    , AllowAmbiguousTypes
+    , UndecidableInstances
+
+
+library
+  import:
+      common-stanza
+  exposed-modules:
+        Arbitrary
+      , Syntax
+      , ConcreteSyntax
+      , Environment
+      , Equal
+      , PrettyPrint
+      , LayoutToken
+      , Parser
+      , ScopeCheck
+      , Modules
+      , TypeCheck
+  hs-source-dirs:
+      src
+      , examples
+
+
+

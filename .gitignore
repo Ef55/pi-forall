@@ -19,3 +19,6 @@ stack.yaml.lock
 *.bbl
 **/.vscode/**
 *.synctex.gz
+
+.direnv/
+.envrc
