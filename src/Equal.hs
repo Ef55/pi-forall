@@ -194,14 +194,17 @@ instance Named LocalName (SNat p) where
       go SZ = VNil
       go (snat_ -> SS_ q) = LocalName ("_" ++ show (SNat.succ q)) ::: go q
 
--- | 'Unify' the two terms, producing a list of definitions that
--- must hold for the terms to be equal
--- If the terms are already equal, succeed with an empty list
--- If there is an obvious mismatch, fail with an error
--- If either term is "ambiguous" (i.e. neutral), give up and
--- succeed with an empty list
-unify :: forall n. Term n -> Term n -> TcMonad n (Refinement Term n)
-unify t1 t2 = do
+
+-- If there one of the terms is "ambiguous" (i.e. neutral), then the behavior
+-- depends on the mode:
+--  - In "strict" mode, this is considered a mismatch: fail with an error
+--  - In "best-effort" mode, it is assumed that some solution exists: succeeds
+--    with empty unifier, i.e without propagating any information.
+-- In other words:
+--  - In "strict" mode, success indicates that there is a solution (which is returned);
+--  - In "best-effort" mode, failure indicates that there is no solution.
+unify :: forall n. Bool -> Term n -> Term n -> TcMonad n (Refinement Term n)
+unify strict t1 t2 = do
   s <- scope @LocalName
   withSNat (scope_size s) $ go SZ t1 t2
   where
@@ -243,9 +246,10 @@ unify t1 t2 = do
             ds2 <- go p b1 b2
             joinR ds1 ds2 `Env.whenNothing` [DS "cannot join refinements"]
           _ ->
-            if amb txnf || amb tynf
+            if not strict && (amb txnf || amb tynf)
               then return Env.emptyR
               else Env.err [DS "Cannot equate", DD txnf, DS "and", DD tynf]
+    goArgs :: forall n p. SNatI n => SNat p -> [Term (p + n)] -> [Term (p + n)] -> TcMonad (p + n) (Refinement Term n)
     goArgs p (t1 : a1s) (t2 : a2s) = do
       ds <- go p t1 t2
       ds' <- goArgs p a1s a2s
@@ -257,6 +261,7 @@ unify t1 t2 = do
 -- In general, elimination forms are ambiguous because there are multiple
 -- solutions.
 amb :: Term n -> Bool
+amb (Var _) = True -- In case of recursive equation(s)
 amb (App t1 t2) = True
 amb (Case _ _) = True
 amb (Subst _ _) = True
