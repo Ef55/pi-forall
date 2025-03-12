@@ -27,10 +27,10 @@ examples :: TestTree
 examples =
   testGroup
     "Examples"
-    (tcFiles "pi" ["Equality", "Lennart", "List", "Vec"])
+    (positiveTests "pi" ["Equality", "Lennart", "List", "Vec"])
 
 baseTests :: TestTree
-baseTests = testGroup "Base tests" (tcFiles "test/base" ["Fail"])
+baseTests = testGroup "Base tests" (negativeTests "test/base" ["Fail", "ConstructorEvidence"])
 
 main :: IO ()
 main = do
@@ -49,8 +49,12 @@ main = do
 standardLibrary :: [String]
 standardLibrary = ["pi"]
 
-tcFiles :: String -> [String] -> [TestTree]
-tcFiles path tests = tcFile [path] <$> tests
+positiveTests :: String -> [String] -> [TestTree]
+positiveTests path tests = tcFile [path] True <$> tests
+
+
+negativeTests :: String -> [String] -> [TestTree]
+negativeTests path tests = tcFile [path] False <$> tests
 
 --------------------------------------------------------------------------------
 -- Testing functions
@@ -71,8 +75,8 @@ tester testName path fileName k = testCase testName $ do
       (Right res, logs) -> k $ TestSuccess res (filter (not . Log.isInfo) logs)
 
 -- | Type check the given file
-tcFile :: [String] -> String -> TestTree
-tcFile path name = tester (name ++ " [✔]") path name $ \case
+tcFile :: [String] -> Bool -> String -> TestTree
+tcFile path positive name = tester (name ++ if positive then " [✔]" else " [✘]") path name $ \case
   ParsingFailure err -> assertFailure $ "Parsing error:" ++ show err
   TypingFailure err -> assertFailure $ "Type error:" ++ show (displayErr err PP.initDI)
   TestSuccess _ logs@(_ : _) -> assertFailure $ "Warnings were produced:" ++ intercalate "\n" (fmap show logs)
