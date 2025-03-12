@@ -70,6 +70,8 @@ Optional components in this BNF are marked with < >
          ...
          Cn of Dn
 
+      fail decl                Checks that decl is rejected by the typechecker
+
   telescopes:
     D ::=
                                Empty
@@ -191,7 +193,8 @@ piforallStyle =
           "then",
           "else",
           "Unit",
-          "()"
+          "()",
+          "fail"
         ],
       Token.reservedOpNames =
         ["!", "?", "\\", ":", ".", ",", "<", "=", "+", "-", "*", "^", "()", "_", "|", "{", "}"]
@@ -343,8 +346,8 @@ telebindings = many teleBinding
 --- Top level declarations
 ---
 
-decl, declDef, valDef :: LParser ModuleEntry
-decl = try dataDef <|> declDef <|> valDef
+decl, declDef, valDef, failDef :: LParser ModuleEntry
+decl = try dataDef <|> declDef <|> valDef <|> failDef
 
 -- datatype declarations
 dataDef :: LParser ModuleEntry
@@ -388,6 +391,11 @@ declDef = do
 valDef = do
   LocalName n <- try (do n <- variable; reservedOp "="; return n)
   ModuleDef n <$> expr
+
+failDef = do
+  reserved "fail"
+  ModuleFail <$> decl
+
 
 ------------------------
 ------------------------

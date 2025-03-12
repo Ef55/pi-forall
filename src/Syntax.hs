@@ -116,6 +116,7 @@ data ModuleEntry
   = ModuleDecl {declName :: GlobalName, declType :: Typ Z}
   | ModuleDef {declName :: GlobalName, declTerm :: Term Z}
   | ModuleData {declName :: GlobalName, declData :: DataDef}
+  | ModuleFail {failing :: ModuleEntry}
 
 -- | module names
 type ModuleName = String

@@ -45,6 +45,7 @@ scopeCheckEntry :: C.ModuleEntry -> Maybe S.ModuleEntry
 scopeCheckEntry (C.ModuleDecl gn ty) = S.ModuleDecl gn <$> scopeCheck ty
 scopeCheckEntry (C.ModuleDef gn tm) = S.ModuleDef gn <$> scopeCheck tm
 scopeCheckEntry (C.ModuleData dn datadef) = S.ModuleData dn <$> scopeCheckData datadef
+scopeCheckEntry (C.ModuleFail failing) = S.ModuleFail <$> scopeCheckEntry failing
 
 data ScopedTele n
   = forall p. (SNatI p) => ScopedTele [(LocalName, Fin (p + n))] (S.Telescope p n)

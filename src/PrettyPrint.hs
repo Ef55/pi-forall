@@ -146,6 +146,9 @@ instance Display ModuleEntry where
     dn <- display n
     dd <- display dataDef
     pure $ PP.pretty "data" <+> dn <+> dd
+  display (ModuleFail failing) = do
+    df <- display failing
+    pure $ PP.pretty "fail" <+> df
 
 instance Display DataDef where
   display (DataDef params sort constructors) = do
