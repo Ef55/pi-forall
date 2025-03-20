@@ -326,18 +326,18 @@ instance Display (Term n) where
     dx <- withPrec (levelApp + 1) (display x)
     return $ parens (levelApp < n) $ df <+> dx
   display (Pi a bnd) = do
-    Local.unbind bnd $ \(n, b) -> do
-      p <- ask prec
-      lhs <-
-        if Fin.f0 `appearsFree` b
-          then do
-            dn <- display n
-            da <- withPrec 0 (display a)
-            return $ PP.parens (dn <+> PP.colon <+> da)
-          else do
-            withPrec (levelArrow + 1) (display a)
-      db <- local (push n) $ withPrec levelPi (display b)
-      return $ parens (levelArrow < p) $ lhs <+> PP.pretty "->" <+> db
+    let (n, b) = Local.unbindl bnd
+    p <- ask prec
+    lhs <-
+      if Fin.f0 `appearsFree` b
+        then do
+          dn <- display n
+          da <- withPrec 0 (display a)
+          return $ PP.parens (dn <+> PP.colon <+> da)
+        else do
+          withPrec (levelArrow + 1) (display a)
+    db <- local (push n) $ withPrec levelPi (display b)
+    return $ parens (levelArrow < p) $ lhs <+> PP.pretty "->" <+> db
   display (Ann a b) = do
     sa <- ask showAnnots
     if sa
@@ -351,47 +351,47 @@ instance Display (Term n) where
     da <- withPrec 0 (display a)
     db <- withPrec 0 (display b)
     return $ PP.parens (da <+> PP.pretty "=" <+> db)
-  display (TyCon "Sigma" [tyA, Lam bnd]) =
-    Local.unbind bnd $ \(x, tyB) -> do
-      if Fin.f0 `appearsFree` tyB
-        then do
-          dx <- display x
-          dA <- withPrec 0 $ display tyA
-          dB <- local (push x) $ withPrec 0 $ display tyB
-          return $
-            PP.pretty "{"
-              <+> dx
-              <+> PP.pretty ":"
-              <+> dA
-              <+> PP.pretty "|"
-              <+> dB
-              <+> PP.pretty "}"
-        else do
-          p <- ask prec
-          dA <- withPrec levelSigma $ display tyA
-          dB <- withPrec levelSigma $ display tyB
-          return $ parens (levelSigma < p) (dA PP.<+> PP.pretty "*" PP.<+> dB)
+  display (TyCon "Sigma" [tyA, Lam bnd]) = do
+    let (x, tyB) = Local.unbindl bnd
+    if Fin.f0 `appearsFree` tyB
+      then do
+        dx <- display x
+        dA <- withPrec 0 $ display tyA
+        dB <- local (push x) $ withPrec 0 $ display tyB
+        return $
+          PP.pretty "{"
+            <+> dx
+            <+> PP.pretty ":"
+            <+> dA
+            <+> PP.pretty "|"
+            <+> dB
+            <+> PP.pretty "}"
+      else do
+        p <- ask prec
+        dA <- withPrec levelSigma $ display tyA
+        dB <- withPrec levelSigma $ display tyB
+        return $ parens (levelSigma < p) (dA PP.<+> PP.pretty "*" PP.<+> dB)
   display (DataCon "," [a, b]) = do
     p <- ask prec
     da <- withPrec levelProd $ display a
     db <- withPrec levelProd $ display b
     return $ parens (levelProd < p) (da PP.<> PP.pretty "," PP.<> db)
   display (Let a bnd) = do
-    Local.unbind bnd $ \(x, b) -> do
-      p <- ask prec
-      da <- display a
-      dx <- display x
-      db <- local (push x) $ display b
-      return $
-        parens (levelLet < p) $
-          PP.sep
-            [ PP.pretty "let"
-                <+> dx
-                <+> PP.pretty "="
-                <+> da
-                <+> PP.pretty "in",
-              db
-            ]
+    let (x, b) = Local.unbindl bnd
+    p <- ask prec
+    da <- display a
+    dx <- display x
+    db <- local (push x) $ display b
+    return $
+      parens (levelLet < p) $
+        PP.sep
+          [ PP.pretty "let"
+              <+> dx
+              <+> PP.pretty "="
+              <+> da
+              <+> PP.pretty "in",
+            db
+          ]
   display t
     | Just i <- isNumeral t = display i
   display (TyCon n args) = do
@@ -508,11 +508,11 @@ pushList :: [LocalName] -> DispInfo -> DispInfo
 pushList ns r = foldl (flip push) r ns
 
 gatherBinders :: Term n -> DispInfo -> ([Doc d], Doc d)
-gatherBinders (Lam b) =
-  Local.unbind b $ \(n, body) -> do
-    dn <- display n
-    (rest, body') <- local (push n) $ gatherBinders body
-    return (dn : rest, body')
+gatherBinders (Lam b) = do
+  let (n, body) = Local.unbindl b
+  dn <- display n
+  (rest, body') <- local (push n) $ gatherBinders body
+  return (dn : rest, body')
 gatherBinders body = do
   db <- display body
   return ([], db)
