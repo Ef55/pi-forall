@@ -3,6 +3,6 @@ allow-newer: true
 packages:
 - .
 extra-deps:
-- github: sweirich/autoenv
-  commit: 67d5354814bfd9aa4177b840b9fe37cbb98af921
+- github: Ef55/autoenv
+  commit: 4ba23b1d61fbe8c8c97a34556a4dd0a4b4382115
 notify-if-nix-on-path: false

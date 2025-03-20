@@ -32,6 +32,18 @@ examples =
 baseTests :: TestTree
 baseTests = testGroup "Base tests" (negativeTests "test/base" ["Fail", "ConstructorEvidence"])
 
+bugs :: TestTree
+bugs =
+  testGroup
+    "Bugs"
+    ( positiveTests
+        "test/reproducers"
+        [ -- https://github.com/sweirich/autoenv/pull/2
+          "Bug1",
+          "Bug2"
+        ]
+    )
+
 main :: IO ()
 main = do
   defaultMain $
@@ -39,7 +51,8 @@ main = do
       "All"
       [ QC.testProperty "PP-Parsing round trip" prop_roundtrip,
         examples,
-        baseTests
+        baseTests,
+        bugs
       ]
 
 --------------------------------------------------------------------------------
@@ -51,7 +64,6 @@ standardLibrary = ["pi"]
 
 positiveTests :: String -> [String] -> [TestTree]
 positiveTests path tests = tcFile [path] True <$> tests
-
 
 negativeTests :: String -> [String] -> [TestTree]
 negativeTests path tests = tcFile [path] False <$> tests

@@ -30,19 +30,19 @@ equate t1 t2 = do
     (TyType, TyType) -> return ()
     (Var x, Var y) | x == y -> return ()
     (Lam bnd1, Lam bnd2) -> do
-      push @LocalName
+      push
         (Pat.getPat bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (App a1 a2, App b1 b2) ->
       equate a1 b1 >> equate a2 b2
     (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
       equate tyA1 tyA2
-      push @LocalName
+      push
         (L.getLocalName bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (Let rhs1 bnd1, Let rhs2 bnd2) -> do
       equate rhs1 rhs2
-      push @LocalName
+      push
         (L.getLocalName bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (TyCon c1 ts1, TyCon c2 ts2)
@@ -55,8 +55,7 @@ equate t1 t2 = do
           equate s1 s2
           -- require branches to be in the same order
           -- on both expressions
-          s <- scope @LocalName
-          withSNat (scope_size s) $ do
+          withSize $ do
             let matchBr :: Match n -> Match n -> TcMonad n ()
                 matchBr (Branch bnd1) (Branch bnd2) =
                   Pat.unbind bnd1 $ \p1 a1 ->
@@ -64,7 +63,7 @@ equate t1 t2 = do
                       Refl <-
                         patEq p1 p2
                           `Env.whenNothing` [DS "Cannot match branches in", DD n1, DS "and", DD n2]
-                      push @LocalName p1 (equate a1 a2)
+                      push  p1 (equate a1 a2)
             zipWithM_ matchBr brs1 brs2
     (TyEq a1 b1, TyEq a2 b2) -> do
       equate a1 a2
@@ -187,14 +186,6 @@ whnf PrintMe = pure (DataCon "()" [])
 whnf tm = do
   return tm
 
-instance Named LocalName (SNat p) where
-  patLocals = go
-    where
-      go :: forall p. SNat p -> Vec p LocalName
-      go SZ = VNil
-      go (snat_ -> SS_ q) = LocalName ("_" ++ show (SNat.succ q)) ::: go q
-
-
 -- If there one of the terms is "ambiguous" (i.e. neutral), then the behavior
 -- depends on the mode:
 --  - In "strict" mode, this is considered a mismatch: fail with an error
@@ -205,11 +196,10 @@ instance Named LocalName (SNat p) where
 --  - In "best-effort" mode, failure indicates that there is no solution.
 unify :: forall n. Bool -> Term n -> Term n -> TcMonad n (Refinement Term n)
 unify strict t1 t2 = do
-  s <- scope @LocalName
-  withSNat (scope_size s) $ go SZ t1 t2
+  withSize $ go SZ t1 t2
   where
     go :: forall n p. (SNatI n) => SNat p -> Term (p + n) -> Term (p + n) -> TcMonad (p + n) (Refinement Term n)
-    go p tx ty = withSNat (sPlus p (snat :: SNat n)) $ do
+    go p tx ty = withSize $ do
       (txnf :: Term (p + n)) <- whnf tx
       (tynf :: Term (p + n)) <- whnf ty
       if txnf == tynf
@@ -231,13 +221,13 @@ unify strict t1 t2 = do
           (TyCon s1 tms1, TyCon s2 tms2)
             | s1 == s2 -> goArgs p tms1 tms2
           (Lam bnd1, Lam bnd2) -> do
-            push @LocalName
+            push
               (L.getLocalName bnd1)
               (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
           (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
             ds1 <- go p tyA1 tyA2
             ds2 <-
-              push @LocalName
+              push
                 (L.getLocalName bnd1)
                 (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
             joinR ds1 ds2 `Env.whenNothing` [DS "cannot join refinements"]

@@ -18,12 +18,6 @@ import Data.Vec qualified as Vec
 import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
 import Unsafe.Coerce (unsafeCoerce)
 
--- inScope :: Scope LocalName n -> (SNatI n => a) -> a
--- inScope s = withSNat (scope_size s)
-
--- getScope :: Pattern p -> Scope LocalName p
--- getScope p = Scope { scope_size = size p, scope_locals = patLocals p }
-
 -- | names of top level declarations/definitions
 -- must be unique
 type GlobalName = String
@@ -219,9 +213,9 @@ instance Sized (Pattern p) where
   size (PatVar _) = s1
 
 instance Named LocalName (Pattern p) where
-  patLocals :: Pattern p -> Vec p LocalName
-  patLocals (PatVar x) = x ::: VNil
-  patLocals (PatCon _ p) = patLocals p
+  names :: Pattern p -> Vec p LocalName
+  names (PatVar x) = x ::: VNil
+  names (PatCon _ p) = names p
 
 -- scoped patterns
 
@@ -236,8 +230,8 @@ instance Scoped.ScopedSized (Local p) where
 instance Scoped.IScopedSized Local
 
 instance Named LocalName (Local p n) where
-  patLocals (LocalDecl x _) = x ::: VNil
-  patLocals (LocalDef _ _) = VNil
+  names (LocalDecl x _) = x ::: VNil
+  names (LocalDef _ _) = VNil
 
 ----------------------------------------------
 --  Subst instances
