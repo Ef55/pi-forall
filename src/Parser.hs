@@ -381,7 +381,7 @@ constructorDef =
     pos <- getPosition
     cname <- identifier
     args <- option [] (reserved "of" >> telescope)
-    return $ ConstructorDef pos cname args
+    return $ ConstructorDef (Just pos) cname args
     <?> "Constructor"
 
 declDef = do
