@@ -85,7 +85,7 @@ data DataDef = DataDef
   }
 
 data ConstructorDef = ConstructorDef
-  { con_pos :: SourcePos,
+  { con_pos :: Maybe SourcePos,
     con_name :: DataConName,
     con_arguments :: Telescope
   }
