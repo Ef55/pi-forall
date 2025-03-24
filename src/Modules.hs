@@ -106,7 +106,7 @@ reparse (ModuleInfo _ fileName _) = do
   cnames <- get
   cmodu <- parseModuleFile cnames fileName
   put (C.moduleConstructors cmodu)
-  case scopeCheckModule cmodu of
+  case scope cmodu of
     Just m -> return m
     Nothing -> error $ "scope checking failed"
 
@@ -122,7 +122,7 @@ go str = do
   case parseExpr str of
     Left parseError -> putParseError parseError
     Right term -> do
-      case scopeCheck term of
+      case scope term of
         Nothing -> putStrLn "scope check failed"
         Just term' -> do
           putStrLn $ "parsed and scope checked as"

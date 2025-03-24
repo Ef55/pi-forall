@@ -23,12 +23,12 @@ import Text.Parsec.Error (ParseError)
 -- | Round trip property: a given term prints then parses to the same term.
 prop_roundtrip :: Term -> QC.Property
 prop_roundtrip tm
-  | Just stm <- scopeCheck tm =
+  | Just stm <- scope tm =
       let str = pp stm
        in case test_parseExpr str of
             Left _ -> QC.counterexample ("*** Could not parse:\n" ++ str) False
             Right tm' ->
-              case scopeCheck tm' of
+              case scope tm' of
                 Just stm' ->
                   QC.counterexample
                     ( "*** Round trip failure! Parsing:\n"
