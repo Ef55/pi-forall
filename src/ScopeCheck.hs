@@ -6,7 +6,7 @@
 -- Stability   : experimental
 --
 -- This module demonstrates a translation from unscoped to well-scoped terms
-module ScopeCheck (Scoping (..), scopeUnder, scope, unscope) where
+module ScopeCheck (Some1 (..), Scoping (..), scopeUnder, scope, unscope) where
 
 import AutoEnv.Bind.Local qualified as L
 import AutoEnv.Bind.Pat (PatList (..))
@@ -32,73 +32,64 @@ import Prelude hiding (lookup)
 --- the API, so we have to handle them separately
 --------------------------------------------------------------------------------
 
-data ScopedPattern n
-  = forall p.
-    (SNatI p) =>
-    ScopedPattern (S.Pattern p)
+data Some1 (p :: Nat -> Type) where
+  Some1 :: forall x p. (SNatI x) => (p x) -> Some1 p
 
-data ScopedPatList n
-  = forall p.
-    (SNatI p) =>
-    ScopedPatList (Pat.PatList S.Pattern p)
+data Some2 (p :: Nat -> Nat -> Type) n where
+  Some2 :: forall x n p. (SNatI x) => (p x n) -> Some2 p n
 
-data ScopedTele n
-  = forall p. (SNatI p) => ScopedTele (S.Telescope p n)
-
-scopeCheckTele :: forall n. (SNatI n) => C.Telescope -> Scope n (ScopedTele n)
-scopeCheckTele [] = pure $ ScopedTele Scoped.TNil
-scopeCheckTele (C.EntryDecl n ty : entries) = do
+scopeTelescope :: forall n. C.Telescope -> Scope n (Some2 S.Telescope n)
+scopeTelescope [] = pure $ Some2 Scoped.TNil
+scopeTelescope (C.EntryDecl n ty : entries) = do
   ty' <- scope' ty
   Scoped.push n $ do
-    ScopedTele (tele' :: S.Telescope p (S n)) <- scopeCheckTele entries
-    let fact :: p + S n :~: (p + N1) + n
-        fact = axiomAssoc @p @N1 @n
-    withSNat (sPlus (snat @p) s1) $ case fact of
-      Refl -> do
-        let ret = S.LocalDecl n ty' <:> tele'
-        return $ ScopedTele ret
-scopeCheckTele (C.EntryDef n tm : entries) = do
+    Some2 @p1 tele' <- scopeTelescope entries
+    let ret = S.LocalDecl n ty' <:> tele'
+    withSNat (sPlus (snat @p1) (snat @(S Z))) $
+      return $ Some2 ret
+scopeTelescope (C.EntryDef n tm : entries) = do
   tm' <- scope' tm
-  ScopedTele (tele' :: S.Telescope p n) <- scopeCheckTele entries
+  Some2 (tele' :: S.Telescope p n) <- scopeTelescope entries
   case axiomPlusZ @p of
     Refl -> do
       ln <- Maybe.fromJust <$> lookup n
       let ret = S.LocalDef ln tm' <:> tele'
-      return $ ScopedTele ret
-
-toP :: (SNatI n) => C.Pattern -> Scope n (ScopedPattern n)
-toP (C.PatVar x) =
-  return (ScopedPattern (S.PatVar x))
-toP (C.PatCon n pats) = do
-  ScopedPatList pats' <- toPL pats
-  return (ScopedPattern (S.PatCon n pats'))
-
-toPL :: forall n. (SNatI n) => [C.Pattern] -> Scope n (ScopedPatList n)
-toPL [] = return $ ScopedPatList Pat.PNil
-toPL (p : ps) = do
-  ScopedPattern (p' :: S.Pattern p) <- toP p
-  withSNat (sPlus (snat :: SNat p) (snat :: SNat n)) $ do
-    ScopedPatList (ps' :: Pat.PatList S.Pattern p1) <-
-      toPL ps
-    let Refl = axiomAssoc @p1 @p @n
-    withSNat (sPlus (snat :: SNat p1) (snat :: SNat p)) (return $ ScopedPatList (Pat.PCons p' ps'))
-
-unscopeLocal :: S.Local p n -> Unscope n C.Entry
-unscopeLocal (S.LocalDecl n t) = C.EntryDecl n <$> unscope' t
-unscopeLocal (S.LocalDef n t) = C.EntryDef <$> unscope' (Local n) <*> unscope' t
+      return $ Some2 ret
 
 unscopeTelescope :: S.Telescope p n -> Unscope n [C.Entry]
 unscopeTelescope Scoped.TNil = return []
 unscopeTelescope (Scoped.TCons h t) =
   (:) <$> unscopeLocal h <*> Scoped.push h (unscopeTelescope t)
+  where
+    unscopeLocal :: S.Local p n -> Unscope n C.Entry
+    unscopeLocal (S.LocalDecl n t) = C.EntryDecl n <$> unscope' t
+    unscopeLocal (S.LocalDef n t) = C.EntryDef <$> unscope' (Local n) <*> unscope' t
 
-unscopePatList :: Pat.PatList S.Pattern p -> [C.Pattern]
-unscopePatList Pat.PNil = []
-unscopePatList (Pat.PCons pat t) = unscopePattern pat : unscopePatList t
+scopePattern :: C.Pattern -> Scope n (Some1 S.Pattern)
+scopePattern (C.PatVar x) = return $ Some1 $ S.PatVar x
+scopePattern (C.PatCon name pats) = do
+  Some1 pats' <- scopePatList pats
+  return $ Some1 $ S.PatCon name pats'
+  where
+    scopePatList :: [C.Pattern] -> Scope n (Some1 (Pat.PatList S.Pattern))
+    scopePatList [] = return $ Some1 Pat.PNil
+    scopePatList (p : ps) = do
+      Some1 (p' :: S.Pattern p) <- scopePattern p
+      Some1 (ps' :: Pat.PatList S.Pattern p1) <- scopePatList ps
+      withSNat
+        (sPlus (snat :: SNat p1) (snat :: SNat p))
+        (return $ Some1 (Pat.PCons p' ps'))
 
 unscopePattern :: S.Pattern p -> C.Pattern
-unscopePattern (S.PatCon name pats) = C.PatCon name $ unscopePatList pats
-unscopePattern (S.PatVar n) = C.PatVar n
+unscopePattern = unscopePattern'
+  where
+    unscopePattern' :: S.Pattern p -> C.Pattern
+    unscopePattern' (S.PatVar n) = C.PatVar n
+    unscopePattern' (S.PatCon name pats) = C.PatCon name $ unscopePatList pats
+
+    unscopePatList :: Pat.PatList S.Pattern p -> [C.Pattern]
+    unscopePatList Pat.PNil = []
+    unscopePatList (Pat.PCons pat t) = unscopePattern' pat : unscopePatList t
 
 --------------------------------------------------------------------------------
 --- Scoping interface
@@ -109,7 +100,7 @@ type Scope n = Scoped.ScopedReaderT LocalName Maybe n
 type Unscope n a = ScopedReader LocalName n a
 
 class Scoping n u s | n u -> s, s -> u, s -> n where
-  scope' :: (SNatI n) => u -> Scope n s
+  scope' :: u -> Scope n s
   unscope' :: s -> Unscope n u
 
 scopeUnder :: (SNatI n, Scoping n u s) => Vec n LocalName -> u -> Maybe s
@@ -130,9 +121,6 @@ data ScopedName n = Local (Fin n) | Global String
 toTerm :: ScopedName n -> S.Term n
 toTerm (Local n) = S.Var n
 toTerm (Global n) = S.Global n
-
-push :: a -> [(a, Fin n)] -> [(a, Fin (S n))]
-push x vs = (x, FZ) : map (fmap FS) vs
 
 lookup :: LocalName -> Scope n (Maybe (Fin n))
 lookup n = iter . Scoped.scope_names <$> Scoped.scope
@@ -155,17 +143,17 @@ instance Scoping n LocalName (ScopedName n) where
 
 instance Scoping n C.Match (S.Match n) where
   scope' (C.Branch pat tm) = do
-    ScopedPattern (pat' :: S.Pattern p) <- toP pat
-    tm' <- Scoped.push pat' $ withSNat (sPlus (snat @p) (snat @n)) $ scope' tm
+    Some1 (pat' :: S.Pattern p) <- scopePattern pat
+    tm' <- Scoped.push pat' $ scope' tm
     return (S.Branch (Pat.bind pat' tm'))
 
   unscope' :: S.Match n -> Unscope n C.Match
   unscope' (S.Branch bnd) = do
-    (pat, t) <- Scoped.withSize $ return $ Pat.unbindl bnd
+    (pat, t) <- return $ Pat.unbindl bnd
     C.Branch (unscopePattern pat) <$> Scoped.push pat (unscope' t)
 
 instance Scoping n C.Term (S.Term n) where
-  scope' :: (SNatI n) => C.Term -> Scope n (S.Term n)
+  scope' :: C.Term -> Scope n (S.Term n)
   scope' C.TyType = return S.TyType
   scope' (C.Var v) = toTerm <$> scope' v
   scope' (C.Global x) = return (S.Global x)
@@ -247,9 +235,9 @@ instance Scoping n C.Term (S.Term n) where
   unscope' S.PrintMe = return C.PrintMe
 
 instance Scoping n C.ConstructorDef (S.ConstructorDef n) where
-  scope' :: (SNatI n) => C.ConstructorDef -> Scope n (S.ConstructorDef n)
+  scope' :: C.ConstructorDef -> Scope n (S.ConstructorDef n)
   scope' (C.ConstructorDef p dc theta) = do
-    ScopedTele theta' <- scopeCheckTele theta
+    Some2 theta' <- scopeTelescope theta
     pure $ S.ConstructorDef dc theta'
 
   unscope' :: S.ConstructorDef n -> Unscope n C.ConstructorDef
@@ -257,15 +245,15 @@ instance Scoping n C.ConstructorDef (S.ConstructorDef n) where
 
 instance Scoping Z C.DataDef S.DataDef where
   scope' (C.DataDef delta s cs) = do
-    ScopedTele (delta' :: S.Telescope p Z) <- scopeCheckTele delta
+    Some2 (delta' :: S.Telescope p Z) <- scopeTelescope delta
     s' <- scope' s
     cs' <- case axiomPlusZ @p of Refl -> Scoped.push delta' $ mapM scope' cs
     return $ S.DataDef delta' s' cs'
 
-  unscope' (S.DataDef @n delta sort cstrs) = do
+  unscope' (S.DataDef @p delta sort cstrs) = do
     delta' <- unscopeTelescope delta
     sort' <- unscope' sort
-    cstrs' <- case axiomPlusZ @n of Refl -> Scoped.push delta $ mapM unscope' cstrs
+    cstrs' <- case axiomPlusZ @p of Refl -> Scoped.push delta $ mapM unscope' cstrs
     return $ C.DataDef delta' sort' cstrs'
 
 instance Scoping Z C.ModuleEntry S.ModuleEntry where
