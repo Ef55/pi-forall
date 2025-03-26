@@ -28,6 +28,7 @@ import Equal qualified
 import Log qualified
 import PrettyPrint (D (..), Display (..), debug, disp, pp)
 import Prettyprinter (pretty)
+import ScopeCheck (Some1 (..))
 import Syntax
 
 ---------------------------------------------------------------------
@@ -103,7 +104,7 @@ inferType a ctx = case a of
                 DS "arguments."
               ]
           let thetai' = weakenTeleClosed thetai
-          _ <- tcArgTele args thetai' ctx
+          tcArgTele args thetai' ctx
           return $ TyCon tname []
       [_] ->
         Env.err
@@ -232,7 +233,7 @@ checkType tm ty ctx = do
                 DS "arguments."
               ]
           newTele <- substTele True delta params theta
-          (r', ref) <- tcArgTele args newTele ctx
+          tcArgTele args newTele ctx
           return ()
         _ ->
           Env.err [DS "Unexpected type", DD ty', DS "for data constructor", DD tm]
@@ -273,8 +274,8 @@ checkType tm ty ctx = do
       tyA <- inferType tm ctx
       Equal.equate tyA ty'
 
-getSomePat :: Match n -> Some Pattern
-getSomePat (Branch bnd) = Some (Pat.getPat bnd)
+getSomePat :: Match n -> Some1 Pattern
+getSomePat (Branch bnd) = Some1 (Pat.getPat bnd)
 
 ---------------------------------------------------------------------
 -- type checking datatype definitions, type constructor applications and
@@ -307,14 +308,9 @@ tcTypeTele (TCons (LocalDef x tm) (tele :: Telescope p2 n)) ctx = do
   r' <- withSize $ return $ fromRefinement r
   let ctx'' = ctx .>> r'
   tcTypeTele tele ctx''
-tcTypeTele
-  ( TCons
-      (LocalDecl x ty)
-      (tl :: Telescope p2 (S n))
-    )
-  ctx = do
-    tcType ty ctx
-    push x $ tcTypeTele tl (Env.extendTy ty ctx)
+tcTypeTele (TCons (LocalDecl x ty) (tl :: Telescope p2 (S n))) ctx = do
+  tcType ty ctx
+  push x $ tcTypeTele tl (Env.extendTy ty ctx)
 
 {-
 G |- tm : A
@@ -331,31 +327,19 @@ tcArgTele ::
   [Term n] ->
   Telescope p n ->
   Context n ->
-  TcMonad n (Env Term (p + n) n, Refinement Term n)
-tcArgTele [] TNil ctx = return (idE, emptyR)
+  TcMonad n ()
+tcArgTele [] TNil ctx = return ()
 tcArgTele args (TCons (LocalDef x ty) (tele :: Telescope p2 n)) ctx = do
   -- ensure that the equality is provable at this point
   Equal.equate (Var x) ty
-  (rho, ref) <- tcArgTele args tele ctx
-  r1 <-
-    withSize $
-      (singletonR (x, ty) `joinR` ref) `Env.whenNothing` [DS "BUG: cannot join refinements"]
-  return (rho, r1)
-tcArgTele
-  (tm : terms)
-  ( TCons
-      (LocalDecl ln ty)
-      (tele :: Telescope p1 (S n))
-    )
-  ctx = case (axiomSus @p1 @n) of
-    Refl -> do
-      checkType tm ty ctx
-      -- Using best-effort would be unsound, as constructors could be
-      -- instantiated without proving that the equality they require are
-      -- satisfied.
-      tele' <- doSubst @N1 True (tm .: idE) tele
-      (ss, r) <- tcArgTele terms tele' ctx
-      return ((tm .: ss, r) :: (Env Term (p + n) n, Refinement Term n))
+  tcArgTele args tele ctx
+tcArgTele (tm : terms) (TCons (LocalDecl ln ty) (tele :: Telescope p2 (S n))) ctx = do
+  checkType tm ty ctx
+  -- Using best-effort would be unsound, as constructors could be
+  -- instantiated without proving that the equality they require are
+  -- satisfied.
+  tele' <- doSubst @N1 True (tm .: idE) tele
+  tcArgTele terms tele' ctx
 tcArgTele [] _ _ =
   Env.err [DS "Too few arguments provided."]
 tcArgTele _ TNil _ =
@@ -693,7 +677,6 @@ duplicateTypeBindingCheck decl = do
 -----------------------------------------------------------
 -- Checking that pattern matching is exhaustive
 -----------------------------------------------------------
-data Some (p :: Nat -> Type) where Some :: forall x p. (SNatI x) => (p x) -> Some p
 
 -- | Given a particular type and a list of patterns, make
 -- sure that the patterns cover all potential cases for that
@@ -704,26 +687,26 @@ data Some (p :: Nat -> Type) where Some :: forall x p. (SNatI x) => (p x) -> Som
 -- Otherwise, the scrutinee type must be a type constructor, so the
 -- code looks up the data constructors for that type and makes sure that
 -- there are patterns for each one.
-exhaustivityCheck :: forall n. Term n -> Typ n -> [Some Pattern] -> Context n -> TcMonad n ()
-exhaustivityCheck scrut ty (Some (PatVar x) : _) ctx = return ()
+exhaustivityCheck :: forall n. Term n -> Typ n -> [Some1 Pattern] -> Context n -> TcMonad n ()
+exhaustivityCheck scrut ty (Some1 (PatVar x) : _) ctx = return ()
 exhaustivityCheck scrut ty pats ctx = do
   (tcon, tys) <- Equal.ensureTCon ty
   DataDef (delta :: Telescope p1 Z) sort datacons <- Env.lookupTCon tcon
-  let loop :: [Some Pattern] -> [ConstructorDef p1] -> TcMonad n ()
+  let loop :: [Some1 Pattern] -> [ConstructorDef p1] -> TcMonad n ()
       loop [] [] = return ()
       loop [] dcons = do
         l <- checkImpossible dcons
         if null l
           then return ()
           else Env.err $ DS "Missing case for" : map DC l
-      loop (Some (PatVar x) : _) dcons = return ()
-      loop (Some (PatCon dc (args :: PatList Pattern p)) : pats') dcons = do
+      loop (Some1 (PatVar x) : _) dcons = return ()
+      loop (Some1 (PatCon dc (args :: PatList Pattern p)) : pats') dcons = do
         (ConstructorDef _ (tele :: Telescope p2 p1), dcons') <- removeDCon dc dcons
         tele' <- substTele False delta tys tele
         let (aargs, pats'') = relatedPats dc pats'
         -- check the arguments of the data constructor together with
         -- all other related argument lists
-        checkSubPats dc tele' (Some args : aargs)
+        checkSubPats dc tele' (Some1 args : aargs)
         loop pats'' dcons'
 
       -- make sure that the given list of constructors is impossible
@@ -764,13 +747,13 @@ removeDCon dc [] = Env.err [DS $ "Internal error: Can't find " ++ show dc]
 -- | Given a particular data constructor name and a list of patterns,
 -- pull out the subpatterns that occur as arguments to that data
 -- constructor and return them paired with the remaining patterns.
-relatedPats :: DataConName -> [Some Pattern] -> ([Some (PatList Pattern)], [Some Pattern])
+relatedPats :: DataConName -> [Some1 Pattern] -> ([Some1 (PatList Pattern)], [Some1 Pattern])
 relatedPats dc [] = ([], [])
-relatedPats dc (pc@(Some (PatVar _)) : pats) = ([], pc : pats)
-relatedPats dc (pc@(Some (PatCon dc' args)) : pats)
+relatedPats dc (pc@(Some1 (PatVar _)) : pats) = ([], pc : pats)
+relatedPats dc (pc@(Some1 (PatCon dc' args)) : pats)
   | dc == dc' =
       let (aargs, rest) = relatedPats dc pats
-       in (Some args : aargs, rest)
+       in (Some1 args : aargs, rest)
 relatedPats dc (pc : pats) =
   let (aargs, rest) = relatedPats dc pats
    in (aargs, pc : rest)
@@ -782,23 +765,23 @@ relatedPats dc (pc : pats) =
 
 -- for simplicity, this function requires that all subpatterns
 -- are pattern variables.
-checkSubPats :: forall p n. DataConName -> Telescope p n -> [Some (PatList Pattern)] -> TcMonad n ()
+checkSubPats :: forall p n. DataConName -> Telescope p n -> [Some1 (PatList Pattern)] -> TcMonad n ()
 checkSubPats dc TNil _ = return ()
-checkSubPats dc (TCons (LocalDef _ _) (tele :: Telescope p2 n)) (patss :: [Some (PatList Pattern)]) =
+checkSubPats dc (TCons (LocalDef _ _) (tele :: Telescope p2 n)) (patss :: [Some1 (PatList Pattern)]) =
   checkSubPats dc tele patss
 checkSubPats
   dc
   (TCons (LocalDecl x _) (tele :: Telescope p2 (S n)))
-  (patss :: [Some (PatList Pattern)]) = do
+  (patss :: [Some1 (PatList Pattern)]) = do
     case allHeadVars patss of
       Just tls -> push x $ checkSubPats @_ @(S n) dc tele tls
       Nothing -> Env.err [DS "All subpatterns must be variables in this version."]
 
 -- check that the head of each list is a single pattern variable and return all of the
 -- tails
-allHeadVars :: [Some (PatList Pattern)] -> Maybe [Some (PatList Pattern)]
+allHeadVars :: [Some1 (PatList Pattern)] -> Maybe [Some1 (PatList Pattern)]
 allHeadVars [] = Just []
-allHeadVars (Some (PCons (PatVar x) (pats :: PatList Pattern p2)) : patss) = do
+allHeadVars (Some1 (PCons (PatVar x) (pats :: PatList Pattern p2)) : patss) = do
   withSNat (size pats) $
-    (Some pats :) <$> allHeadVars patss
+    (Some1 pats :) <$> allHeadVars patss
 allHeadVars _ = Nothing
