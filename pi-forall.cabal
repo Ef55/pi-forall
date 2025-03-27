@@ -80,3 +80,11 @@ test-suite test-pi-forall
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
+
+benchmark bench-pi-forall
+  import: common-stanza
+  build-depends: pi-forall
+    , criterion
+  type: exitcode-stdio-1.0
+  hs-source-dirs: benchmarks
+  main-is: Main.hs

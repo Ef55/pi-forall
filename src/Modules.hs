@@ -1,7 +1,7 @@
 {- pi-forall language -}
 
 -- | Tools for working with multiple source files
-module Modules (getModules, ModuleInfo (..)) where
+module Modules (goFilename, getModules, ModuleInfo (..)) where
 
 import ConcreteSyntax qualified as C
 import Control.Monad
