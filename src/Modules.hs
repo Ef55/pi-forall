@@ -122,18 +122,18 @@ go str = do
   case parseExpr str of
     Left parseError -> putParseError parseError
     Right term -> do
-      case scope term of
+      case ScopeCheck.scope term of
         Nothing -> putStrLn "scope check failed"
-        Just term' -> do
+        Just (term' :: Term n) -> do
           putStrLn $ "parsed and scope checked as"
-          putStrLn $ pp term'
+          putStrLn $ pp $ ScopeCheck.unscope term'
           let (res, logs) = runTcMonad (inferType term' emptyContext)
           mapM_ (putStr . show) logs
           case res of
             Left typeError -> putTypeError (displayErr typeError initDI)
             Right ty -> do
               putStrLn "typed with type"
-              putStrLn $ pp ty
+              putStrLn $ pp $ ScopeCheck.unscope ty
 
 -- | Display a parse error to the user
 putParseError :: ParseError -> IO ()
@@ -160,7 +160,7 @@ goFilename pathToMainFile = do
   let (d, logs) = runTcMonad (tcModules val)
   mapM_ (putStr . show) logs
   defs <- d `exitWith` (putTypeError . flip displayErr initDI)
-  putStrLn $ pp (last defs)
+  putStrLn $ pp $ ScopeCheck.unscope (last defs)
 
 -- | 'pi <filename>' invokes the type checker on the given
 -- file and either prints the types of all definitions in the module

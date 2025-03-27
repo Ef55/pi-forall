@@ -1,37 +1,44 @@
 module Environment where
 
-import Data.FinAux qualified as Fin
-import Data.List
-import Data.Foldable (toList)
-import Data.Maybe ( listToMaybe )
-import Control.Monad.Except
-    ( MonadError(..), ExceptT, runExceptT )
-import Control.Monad.Reader
-    ( MonadReader(local), ask, asks, ReaderT(..) )
-import Control.Monad.IO.Class
-import Text.ParserCombinators.Parsec.Pos (SourcePos)
-import Prettyprinter ( Doc, vcat, sep, (<+>), nest, pretty )
-
-import AutoEnv.Context
-
 import AutoEnv
+import AutoEnv.Bind.Local qualified as Local
+import AutoEnv.Bind.Pat qualified as Pat
+import AutoEnv.Context
 import AutoEnv.Env
-import qualified AutoEnv.Bind.Pat as Pat
 import AutoEnv.MonadScoped
-import qualified AutoEnv.Bind.Local as Local
-import Syntax
-import PrettyPrint
+import AutoEnv.MonadScoped qualified as MonadScoped
+import Control.Monad.Except
+  ( ExceptT,
+    MonadError (..),
+    runExceptT,
+  )
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+  ( MonadReader (local),
+    ReaderT (..),
+    ask,
+    asks,
+  )
 import Control.Monad.Writer (MonadWriter (..), Writer, runWriter)
+import Data.FinAux qualified as Fin
+import Data.Foldable (Foldable (..), toList)
+import Data.List
+import Data.List qualified as List
+import Data.Maybe (listToMaybe)
+import Data.Vec qualified as Vec
 import Log
-import qualified Data.List as List
-
+import PrettyPrint
+import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
+import Prettyprinter qualified as PP
+import ScopeCheck qualified
+import Syntax
+import Text.ParserCombinators.Parsec.Pos (SourcePos)
 
 -------------------------------------------------------
 
 -- * environment and type checking monad
 
 -------------------------------------------------------
-
 
 -- | The type checking Monad includes error (for error reporting) and IO
 -- (for warning messages).
@@ -47,8 +54,7 @@ runTcMonad (TcMonad m) = runWriter (runExceptT (runReaderT m emptyEnv))
 
 -- | Environment manipulation and accessing functions
 data TcEnv n = TcEnv
-  {
-    -- | Datatype definitions, top-level declarations and definitions
+  { -- | Datatype definitions, top-level declarations and definitions
     globals :: [ModuleEntry],
     -- | Type declarations: it's not safe to
     -- put these in the context until a corresponding term
@@ -65,53 +71,62 @@ data TcEnv n = TcEnv
 instance MonadScoped LocalName TcMonad where
   scope = asks env_scope
 
-  pushVec :: SNatI p => Vec p LocalName -> TcMonad (p + n) a -> TcMonad n a
+  pushVec :: (SNatI p) => Vec p LocalName -> TcMonad (p + n) a -> TcMonad n a
   pushVec pat (TcMonad m) =
-    TcMonad (ReaderT $ \env ->
-      runReaderT m
-        TcEnv { globals = globals env,
+    TcMonad
+      ( ReaderT $ \env ->
+          runReaderT
+            m
+            TcEnv
+              { globals = globals env,
                 hints = hints env,
                 sourceLocation = sourceLocation env,
                 env_scope = extendScope pat (env_scope env),
                 env_refinement = shiftRefinement (size pat) (env_refinement env)
-              })
+              }
+      )
 
 -- | Initial environment
 emptyEnv :: TcEnv Z
-emptyEnv = TcEnv {
-  globals = prelude,
-  hints = [],
-  sourceLocation = [],
-  env_scope = emptyScope,
-  env_refinement = emptyR
-}
+emptyEnv =
+  TcEnv
+    { globals = prelude,
+      hints = [],
+      sourceLocation = [],
+      env_scope = emptyScope,
+      env_refinement = emptyR
+    }
 
 --------------------------------------------------------------------
 -- Globals
+
 -- | Find a name's user supplied type signature
 lookupHint :: (MonadReader (TcEnv n) m) => GlobalName -> m (Maybe (Typ n))
 lookupHint v = do
   hints <- asks hints
-  return $ listToMaybe [ weakenClosed ty | (x,ty) <- hints, v == x]
+  return $ listToMaybe [weakenClosed ty | (x, ty) <- hints, v == x]
 
 lookupGlobalTy :: GlobalName -> TcMonad n (Typ n)
 lookupGlobalTy v = do
-    env <- ask
-    case [a | ModuleDecl v' a <- globals env, v == v'] of
-      [a] -> return (weakenClosed a)
-      _   -> do
-        mty <- lookupHint v
-        case mty of
-          Just ty -> return ty
-          Nothing -> err [ DS $ "The variable " ++ show v ++ " was not found" ]
+  env <- ask
+  case [a | ModuleDecl v' a <- globals env, v == v'] of
+    [a] -> return (weakenClosed a)
+    _ -> do
+      mty <- lookupHint v
+      case mty of
+        Just ty -> return ty
+        Nothing -> err [DS $ "The variable " ++ show v ++ " was not found"]
 
 lookupGlobalDef :: GlobalName -> TcMonad n (Term n)
 lookupGlobalDef v = do
-    env <- ask
-    case [a | ModuleDef v' a <- globals env, v == v'] of
-      [a] -> return (weakenClosed a)
-      _  -> err [ DS ("The variable " ++ show v ++ " was not found"),
-            DS "(out of scope)"]
+  env <- ask
+  case [a | ModuleDef v' a <- globals env, v == v'] of
+    [a] -> return (weakenClosed a)
+    _ ->
+      err
+        [ DS ("The variable " ++ show v ++ " was not found"),
+          DS "(out of scope)"
+        ]
 
 -- | Find the datatype declaration of a type constructor in the context
 lookupTCon :: TyConName -> TcMonad n DataDef
@@ -121,13 +136,13 @@ lookupTCon v = do
   where
     scanGamma [] = do
       currentEnv <- asks globals
-      err
+      err $
         [ DS "The type constructor",
           DC v,
           DS "was not found.",
-          DS "The current environment is",
-          DS (pp currentEnv)
+          DS "The current environment is"
         ]
+          <> (DZ <$> currentEnv)
     scanGamma ((ModuleData n d) : g) =
       if n == v
         then return d
@@ -149,8 +164,11 @@ lookupDConAll v = do
         Nothing -> scanGamma g
         Just c -> do
           more <- scanGamma g
-          return $ (tn,
-             ScopedConstructorDef delta c) :  more
+          return $
+            ( tn,
+              ScopedConstructorDef delta c
+            )
+              : more
     scanGamma (_ : g) = scanGamma g
 
 -- | Given the name of a data constructor and the type that it should
@@ -182,11 +200,10 @@ lookupDCon c tname = do
 type Context a = Ctx Term a
 
 weakenDef :: SNat n -> (Fin p, Term p) -> (Fin (n + p), Term (n + p))
-weakenDef m (x,y) = (Fin.weakenFin m x, applyE @Term (weakenE' m) y)
+weakenDef m (x, y) = (Fin.weakenFin m x, applyE @Term (weakenE' m) y)
 
 emptyContext :: Context N0
 emptyContext = emptyC
-
 
 {-
 getLocalCtx :: forall n. SNatI n => TcMonad (Ctx Term n)
@@ -222,7 +239,6 @@ extendDecls :: [(Fin n, Term n)] -> Context m n -> Context m n
 extendDecls d c@(Context gamma defs) = Context n gamma (d ++ defs)
 -}
 
-
 -- | Find the type of a local variable in the context
 -- This cannot fail
 lookupTy :: Fin n -> Context n -> Term n
@@ -244,17 +260,20 @@ extendLocal (LocalDef x u) k ctx = error "TODO: local definitions unsupported"
 
 -- | Marked locations in the source code
 data SourceLocation where
-  SourceLocation :: forall a n. Display a => SourcePos -> a -> Scope LocalName n -> SourceLocation
+  SourceLocation :: forall n u s. (ScopeCheck.Scoping n u s, Display u) => SourcePos -> s -> Scope LocalName n -> SourceLocation
 
 -- | Push a new source position on the location stack.
-extendSourceLocation :: (Display t) => SourcePos -> t -> TcMonad n a -> TcMonad n a
+extendSourceLocation :: (ScopeCheck.Scoping n u s, Display u) => SourcePos -> s -> TcMonad n a -> TcMonad n a
 extendSourceLocation p t m = do
   s <- scope
-  local (\e@TcEnv {sourceLocation = locs} ->
-     e {sourceLocation = SourceLocation p t s : locs}) m
+  local
+    ( \e@TcEnv {sourceLocation = locs} ->
+        e {sourceLocation = SourceLocation p t s : locs}
+    )
+    m
 
 -- | access current source location
-getSourceLocation :: MonadReader (TcEnv n) m => m [SourceLocation]
+getSourceLocation :: (MonadReader (TcEnv n) m) => m [SourceLocation]
 getSourceLocation = asks sourceLocation
 
 --------------------------------------------------------------------
@@ -271,45 +290,71 @@ instance Monoid Err where
   mempty :: Err
   mempty = Err [] mempty
 
-scopedDisplay :: Display a => a -> Scope LocalName n -> Doc ()
-scopedDisplay a s =
- display a (namesDI (toList (scope_names s)))
+-- | Scoped error message quoting
+data D n
+  = DS String
+  | forall a. (Display a) => DC a
+  | forall u s. (ScopeCheck.Scoping n u s, Display u) => DU s
+  | forall u s. (ScopeCheck.Scoping Z u s, Display u) => DZ s
+  | forall t u s. (Foldable t, ScopeCheck.Scoping Z (t u) s, Display u) => DG s
+
+scopedDisplay :: (ScopeCheck.Scoping n u s, Display u) => s -> Scope LocalName n -> Doc ()
+scopedDisplay t s =
+  withSNat (Vec.vlength (scope_names s)) $
+    let t' = ScopeCheck.unscopeUnder (scope_names s) t
+     in disp t'
+
+sdisplay :: D n -> DispInfo -> TcMonad n (Doc ())
+sdisplay (DS s) di = return $ PP.pretty s
+sdisplay (DC c) di = return $ disp c
+sdisplay (DU s) di = scopedDisplay s <$> scope
+sdisplay (DZ s) di = return $ scopedDisplay s MonadScoped.emptyScope
+sdisplay (DG t) di = do
+  let t' = ScopeCheck.unscopeUnder Vec.empty t
+  return $ foldMap disp t'
 
 -- | display an error
 -- TODO: preserve passed in di for printing the term???
 displayErr :: Err -> DispInfo -> Doc ()
 displayErr (Err [] msg) di = msg
-displayErr (Err ((SourceLocation p term s) : ss) msg) di = display p di  <+> nest 2 msg
-      <+> nest 2 (pretty "in the expression"
-                 <+> nest 2 (scopedDisplay term s))
+displayErr (Err ((SourceLocation p term s) : ss) msg) di =
+  display p di
+    <+> nest 2 msg
+    <+> nest
+      2
+      ( pretty "in the expression"
+          <+> nest 2 (scopedDisplay term s)
+      )
 
 -- | Print a warning
 warn :: [D n] -> TcMonad n ()
 warn d = do
   loc <- getSourceLocation
   s <- scope
-  tell $ List.singleton $ Warn $ show (sep $ map (`scopedDisplay` s) d)
+  msg <- mapM (`sdisplay` initDI) d
+  tell $ List.singleton $ Warn $ show (sep msg)
 
 -- | Print an error, making sure that the scope lines up
 err :: [D n] -> TcMonad n b
 err d = do
   loc <- getSourceLocation
   s <- scope
-  throwError $ Err loc (sep $ map (`scopedDisplay` s) d)
+  msg <- mapM (`sdisplay` initDI) d
+  throwError $ Err loc (sep msg)
 
 -- | Augment an error message with addition information (if thrown)
 extendErr :: TcMonad n a -> [D n] -> TcMonad n a
 extendErr ma d =
   ma `catchError` \(Err ps msg) -> do
     s <- scope
-    let msg' = sep $ map (`scopedDisplay` s) d
-    throwError $ Err ps (vcat [msg, msg'])
+    msg' <- mapM (`sdisplay` initDI) d
+    throwError $ Err ps (vcat [msg, sep msg'])
 
 whenNothing :: Maybe a -> [D n] -> TcMonad n a
 whenNothing x msg =
   case x of
-     Just r -> return r
-     Nothing -> err msg
+    Just r -> return r
+    Nothing -> err msg
 
 ensureError :: TcMonad n a -> TcMonad n (Either Err a)
 ensureError c = (Right <$> c) `catchError` \err -> return $ Left err
@@ -324,7 +369,7 @@ extendHints h = local (\m@TcEnv {hints = hs} -> m {hints = h : hs})
 -- | Extend the global environment with a new entry
 extendCtx :: (MonadReader (TcEnv n) m) => ModuleEntry -> m a -> m a
 extendCtx d =
-  local (\m@TcEnv{globals = cs} -> m {globals = d : cs})
+  local (\m@TcEnv {globals = cs} -> m {globals = d : cs})
 
 -- | Extend the context with a list of global bindings
 extendCtxs :: (MonadReader (TcEnv n) m) => [ModuleEntry] -> m a -> m a
