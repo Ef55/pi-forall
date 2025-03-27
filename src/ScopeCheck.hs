@@ -6,8 +6,9 @@
 -- Stability   : experimental
 --
 -- This module demonstrates a translation from unscoped to well-scoped terms
-module ScopeCheck (Some1 (..), Scoping (..), scopeUnder, scope, unscope) where
+module ScopeCheck (Some1 (..), Scoping (..), scopeUnder, unscopeUnder, scope, unscope, unscopePattern) where
 
+import AutoEnv qualified
 import AutoEnv.Bind.Local qualified as L
 import AutoEnv.Bind.Pat (PatList (..))
 import AutoEnv.Bind.Pat qualified as Pat
@@ -21,8 +22,11 @@ import ConcreteSyntax qualified as C
 import Control.Monad (foldM)
 import Control.Monad qualified as Monad
 import Control.Monad.Reader (MonadReader (ask), Reader, asks, runReader)
+import Data.Fin qualified as Fin
+import Data.Fin qualified as Nat
 import Data.Maybe (fromJust)
 import Data.Maybe qualified as Maybe
+import Data.Type.Nat qualified as Nat
 import Data.Vec qualified as Vec
 import Syntax qualified as S
 import Prelude hiding (lookup)
@@ -46,7 +50,8 @@ scopeTelescope (C.EntryDecl n ty : entries) = do
     Some2 @p1 tele' <- scopeTelescope entries
     let ret = S.LocalDecl n ty' <:> tele'
     withSNat (sPlus (snat @p1) (snat @(S Z))) $
-      return $ Some2 ret
+      return $
+        Some2 ret
 scopeTelescope (C.EntryDef n tm : entries) = do
   tm' <- scope' tm
   Some2 (tele' :: S.Telescope p n) <- scopeTelescope entries
@@ -109,8 +114,11 @@ scopeUnder s u = Scoped.runScopedReaderT (scope' u) (Scoped.Scope snat s)
 scope :: (Scoping Z u s) => u -> Maybe s
 scope = scopeUnder Vec.empty
 
-unscope :: (SNatI n, Scoping n u s) => Vec n LocalName -> s -> u
-unscope v t = Scoped.runScopedReader v (unscope' t)
+unscopeUnder :: (SNatI n, Scoping n u s) => Vec n LocalName -> s -> u
+unscopeUnder v t = Scoped.runScopedReader v (unscope' t)
+
+unscope :: (Scoping Z u s) => s -> u
+unscope = unscopeUnder Vec.empty
 
 --------------------------------------------------------------------------------
 --- Scoping instances
@@ -291,3 +299,20 @@ instance Scoping Z C.Module S.Module where
           C.moduleEntries = entries,
           C.moduleConstructors = S.moduleConstructors m
         }
+
+instance Scoping Z (Vec n C.Term) (SNat n, AutoEnv.Env S.Term n n) where
+  scope' = iter AutoEnv.zeroE Nat.SZ
+    where
+      iter :: forall k m. AutoEnv.Ctx S.Term k -> SNat k -> Vec m C.Term -> Scope k (SNat (k + m), AutoEnv.Ctx S.Term (k + m))
+      iter ctx k Vec.VNil = case axiomPlusZ @k of Refl -> return (k, ctx)
+      iter ctx k (x Vec.::: (xs :: Vec m' C.Term)) = do
+        x' <- scope' x
+        let ctx' = ctx AutoEnv.+++ x'
+        case AutoEnv.axiomSus @k @m' of
+          Refl -> Scoped.push (LocalName $ show k) $ iter ctx' (withSNat k Nat.SS) xs
+
+  unscope' (n, e) = do
+    let u = withSNat n $ Vec.universe @n
+        names = LocalName . show <$> u
+    case axiomPlusZ @n of
+      Refl -> Scoped.push names $ mapM (unscope' . AutoEnv.applyE e . S.Var) u
