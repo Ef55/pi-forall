@@ -6,6 +6,7 @@ import Control.Monad.Reader (MonadReader (ask, local), asks)
 import Data.FinAux qualified as Fin
 import Data.List as List
 import Data.LocalName (LocalName)
+import Data.LocalName qualified as LocalName
 import Data.Map qualified as Map
 import Data.Set qualified as S
 import Prettyprinter (Doc, (<+>))
@@ -13,19 +14,17 @@ import Prettyprinter qualified as PP
 import Syntax (ConstructorNames, ModuleImport (..))
 import Text.ParserCombinators.Parsec.Error (ParseError)
 import Text.ParserCombinators.Parsec.Pos (SourcePos, sourceColumn, sourceLine, sourceName)
-import qualified Data.LocalName as LocalName
 
 -------------------------------------------------------------------------
-
--- * Classes and Types for Pretty Printing
-
+-- Classes and Types for Pretty Printing
 -------------------------------------------------------------------------
 
--- | The 'Display' class governs all types which can be turned into 'Doc's
--- The `disp` function is the main entry point for the pretty printer
--- While pretty printing, de Bruijn indices are converted into strings
--- (if possible, using the original names from the source program) using
--- information shored in the DispInfo
+-- | The 'Display' class governs all types which can be turned into 'Doc's The
+-- `disp` function is the main entry point for the pretty printer. Note that
+-- 'Display' instances are only available for the "unscoped" representation of
+-- the language; see 'ScopeCheck' ('unscope' more specifically) to transform a
+-- scoped representation into an unscoped one for pretty-printing.
+
 class Display d where
   display :: d -> DispInfo -> Doc e
 
@@ -55,9 +54,7 @@ data DispInfo = DI
     showLongNames :: Bool
   }
 
--- \| should we print internally-generated names, or user-friendly versions
--- showLongNames :: Bool
-
+-- TODO: should we print internally-generated names, or user-friendly versions?
 
 initDI :: DispInfo
 initDI =
@@ -70,9 +67,7 @@ initDI =
     }
 
 -------------------------------------------------------------------------
-
--- * Display Instances for quoting, errors, source positions, names
-
+-- Display Instances for quoting, errors, source positions, names
 -------------------------------------------------------------------------
 
 instance Display ParseError where
@@ -88,9 +83,7 @@ instance Display SourcePos where
       PP.<> PP.colon
 
 ------------------------------------------------------------------------
-
--- * Display Instances for Modules
-
+-- Display Instances for Modules
 -------------------------------------------------------------------------
 
 instance Display Module where
@@ -172,24 +165,8 @@ instance Display Telescope where
     dtele <- display tele
     return $ PP.brackets (dx <+> PP.equals <+> dtm) <+> dtele
 
--- instance Display (Refinement Term n) where
---   display (Refinement r) di =
---     PP.sep (PP.punctuate PP.comma (map d (Map.toList r)))
---     where
---       d (x, tm) = display (Var x) di <+> PP.pretty "=" <+> display tm di
-
--- This is Context n
--- instance (SNatI m) => Display (Env Term m n) where
---   display r di =
---     let t = tabulate r
---      in PP.sep (PP.punctuate PP.comma (map d t))
---     where
---       d (x, tm) = PP.pretty (show x) <+> PP.pretty "~>" <+> display tm di
-
 -------------------------------------------------------------------------
-
--- * Disp Instances for Prelude types
-
+-- Disp Instances for Prelude types
 -------------------------------------------------------------------------
 
 displayMaybe :: (t -> DispInfo -> Doc d) -> Maybe t -> DispInfo -> Doc d
@@ -289,7 +266,7 @@ nthOpt [] _ = Nothing
 
 instance Display Term where
   display TyType = return $ PP.pretty "Type"
-  display (Global x) = return $ PP.pretty x -- TODO
+  display (Global x) = return $ PP.pretty x
   display (Var n) = display n
   display a@(Lam _ _) = do
     n <- ask prec
@@ -420,11 +397,7 @@ prettyCase scrut xs =
   let top = PP.pretty "case" <+> scrut <+> PP.pretty "of"
    in if null xs
         then top <+> PP.pretty "{ }"
-        else -- PP.nest 2 (top <> PP.line <> PP.encloseSep open close separator xs)
-          PP.nest 2 (top <> PP.hardline <> PP.vsep xs)
-
---  PP.group (PP.pretty "case" <+> scrut <+> PP.pretty "of" <+>
---            PP.align (PP.encloseSep open close separator xs))
+        else PP.nest 2 (top <> PP.hardline <> PP.vsep xs)
 
 instance Display Match where
   display (Branch pat bd) = do
@@ -462,12 +435,6 @@ instance Display LocalName where
 -- * Helper functions for displaying terms
 
 -------------------------------------------------------------------------
-
--- push :: LocalName -> DispInfo -> DispInfo
--- push n r = r {localNames = n : localNames r}
-
--- pushList :: [LocalName] -> DispInfo -> DispInfo
--- pushList ns r = foldl (flip push) r ns
 
 gatherBinders :: Term -> DispInfo -> ([Doc d], Doc d)
 gatherBinders (Lam n body) = do
