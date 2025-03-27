@@ -22,11 +22,11 @@ import Data.List qualified as List
 import Data.Map qualified as Map
 import Data.Maybe (catMaybes)
 import Data.SNat qualified as SNat
-import Environment (Context, TcMonad)
+import Environment (Context, D (..), TcMonad)
 import Environment qualified as Env
 import Equal qualified
 import Log qualified
-import PrettyPrint (D (..), Display (..), debug, disp, pp)
+import PrettyPrint (Display (..), disp, pp)
 import Prettyprinter (pretty)
 import ScopeCheck (Some1 (..))
 import Syntax
@@ -119,7 +119,7 @@ inferType a ctx = case a of
 
   -- cannot synthesize the type of the term
   _ ->
-    Env.err [DS "Must have a type annotation for", DD a]
+    Env.err [DS "Must have a type annotation for", DU a]
 
 -------------------------------------------------------------------------
 
@@ -148,12 +148,13 @@ checkType tm ty ctx = do
       Env.extendSourceLocation p a $ checkType a ty' ctx
     TrustMe -> return ()
     PrintMe -> do
+      s <- scopeSize
       withSize $
         Env.err
           [ DS "Unmet obligation.\nContext:",
-            DD ctx,
+            DG (s, ctx),
             DS "\nGoal:",
-            DD ty'
+            DU ty'
           ]
 
     -- c-let -- treat like immediate application
@@ -208,9 +209,9 @@ checkType tm ty ctx = do
         (_, _) ->
           Env.err
             [ DS "I can't tell that",
-              DD a',
+              DU a',
               DS "and",
-              DD b',
+              DU b',
               DS "are contradictory"
             ]
 
@@ -236,7 +237,7 @@ checkType tm ty ctx = do
           tcArgTele args newTele ctx
           return ()
         _ ->
-          Env.err [DS "Unexpected type", DD ty', DS "for data constructor", DD tm]
+          Env.err [DS "Unexpected type", DU ty', DS "for data constructor", DU tm]
     (Case scrut alts) -> do
       sty <- inferType scrut ctx
       (c, args) <- Equal.ensureTCon sty
@@ -592,9 +593,9 @@ tcEntry (ModuleDef n term) =
             Env.extendCtx decl $ checkType term ty Env.emptyContext
             return (AddCtx [decl, ModuleDef n term])
               `Env.extendErr` [ DS "When checking the term",
-                                DD term,
+                                DU term,
                                 DS "against the type",
-                                DC decl
+                                DZ decl
                               ]
       Right term' ->
         Env.extendSourceLocation
@@ -604,7 +605,7 @@ tcEntry (ModuleDef n term) =
               [ DS "Multiple definitions of",
                 DC n,
                 DS "Previous definition was",
-                DD term'
+                DU term'
               ]
           )
 tcEntry decl@(ModuleDecl x ty) = do
@@ -614,7 +615,7 @@ tcEntry decl@(ModuleDecl x ty) = do
     `Env.extendErr` [ DS "when checking the type declaration",
                       DS x,
                       DS ":",
-                      DC ty
+                      DU ty
                     ]
 -- rule Entry_data
 tcEntry decl@(ModuleData n (DataDef (delta :: Telescope n Z) s cs)) = do
@@ -624,14 +625,17 @@ tcEntry decl@(ModuleData n (DataDef (delta :: Telescope n Z) s cs)) = do
       ctx' <- tcTypeTele delta Env.emptyContext
       ---- check that the telescope provided
       ---  for each data constructor is wellfomed, and elaborate them
-      let checkConstructorDef defn@(ConstructorDef d theta) = do
-            -- TODO: add source position
-            -- Env.extendSourceLocation pos defn $
-            push delta $ tcTypeTele theta ctx'
-            return ()
-              `Env.extendErr` [ DS "when checking the constructor declaration",
-                                DC defn
-                              ]
+      let checkConstructorDef defn@(ConstructorDef d theta) =
+            push delta $
+              ( do
+                  -- TODO: add source position
+                  -- Env.extendSourceLocation pos defn $
+                  tcTypeTele theta ctx'
+                  return ()
+              )
+                `Env.extendErr` [ DS "when checking the constructor declaration",
+                                  DU defn
+                                ]
       Env.extendCtx (ModuleData n (DataDef delta s [])) $
         mapM_ checkConstructorDef cs
       -- Implicitly, we expect the constructors to actually be different...
@@ -644,13 +648,13 @@ tcEntry decl@(ModuleData n (DataDef (delta :: Telescope n Z) s cs)) = do
           ]
       return (AddCtx [decl])
         `Env.extendErr` [ DS "when checking the datatype declaration",
-                          DC decl
+                          DZ decl
                         ]
 tcEntry (ModuleFail failing) = do
   r <- Env.ensureError (tcEntry failing)
   case r of
     Left _ -> return $ AddCtx []
-    Right _ -> Env.err [DS "Statement", DC failing, DS "should fail to typecheck, but succeeded."]
+    Right _ -> Env.err [DS "Statement", DZ failing, DS "should fail to typecheck, but succeeded."]
 
 -- | Make sure that we don't have the same name twice in the
 -- environment. (We don't rename top-level module definitions.)
@@ -668,9 +672,9 @@ duplicateTypeBindingCheck decl = do
       let p = unPosFlaky $ declType decl
           msg =
             [ DS "Duplicate type declaration",
-              DC decl,
+              DZ decl,
               DS "Previous was",
-              DD decl'
+              DU decl'
             ]
        in Env.extendSourceLocation p decl $ Env.err msg
 

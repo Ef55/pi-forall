@@ -11,11 +11,12 @@ import AutoEnv.MonadScoped
 import Control.Monad (unless, zipWithM, zipWithM_)
 import Control.Monad.Except (catchError)
 import Data.SNat qualified as SNat
-import Environment (Context, TcMonad)
+import Environment (Context, D (..), TcMonad)
 import Environment qualified as Env
 import PrettyPrint
 import Prettyprinter as PP
 import Syntax
+import qualified ScopeCheck
 
 -- | compare two expressions for equality
 -- first check if they are alpha equivalent then
@@ -62,8 +63,8 @@ equate t1 t2 = do
                     Pat.unbind bnd2 $ \p2 a2 -> do
                       Refl <-
                         patEq p1 p2
-                          `Env.whenNothing` [DS "Cannot match branches in", DD n1, DS "and", DD n2]
-                      push  p1 (equate a1 a2)
+                          `Env.whenNothing` [DS "Cannot match branches in", DU n1, DS "and", DU n2]
+                      push p1 (equate a1 a2)
             zipWithM_ matchBr brs1 brs2
     (TyEq a1 b1, TyEq a2 b2) -> do
       equate a1 a2
@@ -79,9 +80,9 @@ equate t1 t2 = do
     tyErr n1 n2 = do
       Env.err
         [ DS "Expected",
-          DD n2,
+          DU n2,
           DS "but found",
-          DD n1
+          DU n1
         ]
 
 -- | Match up args
@@ -105,14 +106,14 @@ ensurePi aty = do
   nf <- whnf aty
   case nf of
     (Pi tyA bnd) -> return (tyA, bnd)
-    _ -> Env.err [DS "Expected a function type but found ", DD aty]
+    _ -> Env.err [DS "Expected a function type but found ", DU aty]
 
 ensureEq :: Typ n -> TcMonad n (Term n, Term n)
 ensureEq aty = do
   nf <- whnf aty
   case nf of
     (TyEq a b) -> return (a, b)
-    _ -> Env.err [DS "Expected an equality type but found", DD nf]
+    _ -> Env.err [DS "Expected an equality type but found", DU nf]
 
 -- | Ensure that the given type 'ty' is some tycon applied to
 --  params (or could be normalized to be such)
@@ -122,7 +123,7 @@ ensureTCon aty = do
   nf <- whnf aty
   case nf of
     TyCon n params -> return (n, params)
-    _ -> Env.err [DS "Expected a data type but found", DD nf]
+    _ -> Env.err [DS "Expected a data type but found", DU nf]
 
 -------------------------------------------------------
 
@@ -170,10 +171,10 @@ whnf (Case scrut mtchs) = do
           Env.err $
             [ DS "Internal error: couldn't find a matching",
               DS "branch for",
-              DD nf,
+              DU nf,
               DS "in"
             ]
-              ++ map DD mtchs
+              ++ map DU mtchs
     _ -> return (Case nf mtchs)
 whnf (Subst a b) = do
   nf <- whnf b
@@ -238,8 +239,8 @@ unify strict t1 t2 = do
           _ ->
             if not strict && (amb txnf || amb tynf)
               then return Env.emptyR
-              else Env.err [DS "Cannot equate", DD txnf, DS "and", DD tynf]
-    goArgs :: forall n p. SNatI n => SNat p -> [Term (p + n)] -> [Term (p + n)] -> TcMonad (p + n) (Refinement Term n)
+              else Env.err [DS "Cannot equate", DU txnf, DS "and", DU tynf]
+    goArgs :: forall n p. (SNatI n) => SNat p -> [Term (p + n)] -> [Term (p + n)] -> TcMonad (p + n) (Refinement Term n)
     goArgs p (t1 : a1s) (t2 : a2s) = do
       ds <- go p t1 t2
       ds' <- goArgs p a1s a2s
@@ -269,7 +270,7 @@ patternMatches e (PatVar _) = return (oneE e)
 patternMatches (DataCon n args) (PatCon l ps)
   | l == n = patternMatchList args ps
 patternMatches nf pat =
-  Env.err [DS "arg", DD nf, DS "doesn't match pattern", DC pat]
+  Env.err [DS "arg", DU nf, DS "doesn't match pattern", DC (ScopeCheck.unscopePattern pat)]
 
 patternMatchList :: forall p n. [Term n] -> PatList Pattern p -> TcMonad n (Env Term p n)
 patternMatchList [] PNil = return zeroE

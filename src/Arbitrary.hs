@@ -19,14 +19,15 @@ import Test.QuickCheck
   )
 import Test.QuickCheck qualified as QC
 import Text.Parsec.Error (ParseError)
+import qualified Data.Vec as Vec
 
 -- | Round trip property: a given term prints then parses to the same term.
 prop_roundtrip :: Term -> QC.Property
 prop_roundtrip tm
-  | Just stm <- scope tm =
-      let str = pp stm
+  | Just stm <- ScopeCheck.scope tm =
+      let str = pp $ ScopeCheck.unscope stm
        in case test_parseExpr str of
-            Left _ -> QC.counterexample ("*** Could not parse:\n" ++ str) False
+            Left err -> QC.counterexample ("*** Could not parse:\n" ++ str ++ "\n" ++ show err) False
             Right tm' ->
               case scope tm' of
                 Just stm' ->
@@ -38,7 +39,7 @@ prop_roundtrip tm
                         ++ "\n*** results in\n"
                         ++ show stm'
                         ++ "\n*** printed as\n"
-                        ++ pp stm'
+                        ++ pp (ScopeCheck.unscope  stm')
                     )
                     (stm == stm')
                 Nothing ->
