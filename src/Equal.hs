@@ -6,17 +6,24 @@ import AutoEnv
 import AutoEnv.Bind.Local as L
 import AutoEnv.Bind.Pat as Pat
 import AutoEnv.Bind.Scoped as Scoped
-import AutoEnv.Env as Env
-import AutoEnv.MonadScoped
-import Control.Monad (unless, zipWithM, zipWithM_)
-import Control.Monad.Except (catchError)
+import AutoEnv.DependentScope
+import AutoEnv.DependentScope qualified as Scope
+-- import AutoEnv.Env as Env
+import Control.Monad (foldM, unless, zipWithM, zipWithM_)
+import Control.Monad.Except (ExceptT, MonadError, catchError)
+import Control.Monad.Reader (MonadReader, ReaderT)
+import Control.Monad.Writer (MonadWriter, Writer)
 import Data.SNat qualified as SNat
-import Environment (Context, D (..), TcMonad)
+import Data.Scoped.Const
+import Environment (Context, D (..))
 import Environment qualified as Env
+import Log (Log)
 import PrettyPrint
 import Prettyprinter as PP
+import ScopeCheck qualified
 import Syntax
-import qualified ScopeCheck
+
+type TcMonad = Env.TcMonad Const
 
 -- | compare two expressions for equality
 -- first check if they are alpha equivalent then
@@ -27,23 +34,24 @@ equate t1 t2 | t1 == t2 = return ()
 equate t1 t2 = do
   n1 <- whnf t1
   n2 <- whnf t2
+  r <- Env.getRefinement
   case (n1, n2) of
     (TyType, TyType) -> return ()
     (Var x, Var y) | x == y -> return ()
     (Lam bnd1, Lam bnd2) -> do
-      push
+      Scope.push1u
         (Pat.getPat bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (App a1 a2, App b1 b2) ->
       equate a1 b1 >> equate a2 b2
     (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
       equate tyA1 tyA2
-      push
+      Scope.push1u
         (L.getLocalName bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (Let rhs1 bnd1, Let rhs2 bnd2) -> do
       equate rhs1 rhs2
-      push
+      Scope.push1u
         (L.getLocalName bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (TyCon c1 ts1, TyCon c2 ts2)
@@ -56,7 +64,7 @@ equate t1 t2 = do
           equate s1 s2
           -- require branches to be in the same order
           -- on both expressions
-          withSize $ do
+          Scope.withScopeSize $ do
             let matchBr :: Match n -> Match n -> TcMonad n ()
                 matchBr (Branch bnd1) (Branch bnd2) =
                   Pat.unbind bnd1 $ \p1 a1 ->
@@ -64,7 +72,8 @@ equate t1 t2 = do
                       Refl <-
                         patEq p1 p2
                           `Env.whenNothing` [DS "Cannot match branches in", DU n1, DS "and", DU n2]
-                      push p1 (equate a1 a2)
+                      Scope.push p1 $ do
+                        equate a1 a2
             zipWithM_ matchBr brs1 brs2
     (TyEq a1 b1, TyEq a2 b2) -> do
       equate a1 a2
@@ -78,11 +87,14 @@ equate t1 t2 = do
     (_, _) -> tyErr n1 n2
   where
     tyErr n1 n2 = do
+      r <- Env.getRefinement
       Env.err
         [ DS "Expected",
           DU n2,
           DS "but found",
-          DU n1
+          DU n1,
+          DS "Refinement:",
+          DR r
         ]
 
 -- | Match up args
@@ -138,11 +150,10 @@ whnf (Global y) =
   )
     `catchError` \_ -> return (Global y)
 whnf (Var x) = do
-  -- maybeDef <- Env.lookupDef x
-  -- case maybeDef of
-  --  (Just d) -> whnf d
-  --  _ ->
-  return (Var x)
+  t' <- Env.refine (Var x)
+  if Var x == t'
+    then return t'
+    else whnf t'
 whnf (App t1 t2) = do
   nf <- whnf t1
   case nf of
@@ -187,6 +198,7 @@ whnf PrintMe = pure (DataCon "()" [])
 whnf tm = do
   return tm
 
+-- | Attempt to unify two terms.
 -- If there one of the terms is "ambiguous" (i.e. neutral), then the behavior
 -- depends on the mode:
 --  - In "strict" mode, this is considered a mismatch: fail with an error
@@ -197,38 +209,38 @@ whnf tm = do
 --  - In "best-effort" mode, failure indicates that there is no solution.
 unify :: forall n. Bool -> Term n -> Term n -> TcMonad n (Refinement Term n)
 unify strict t1 t2 = do
-  withSize $ go SZ t1 t2
+  Scope.withScopeSize $ go SZ t1 t2
   where
     go :: forall n p. (SNatI n) => SNat p -> Term (p + n) -> Term (p + n) -> TcMonad (p + n) (Refinement Term n)
-    go p tx ty = withSize $ do
+    go p tx ty = Scope.withScopeSize $ do
       (txnf :: Term (p + n)) <- whnf tx
       (tynf :: Term (p + n)) <- whnf ty
       if txnf == tynf
-        then return Env.emptyR
+        then return emptyR
         else case (txnf, tynf) of
-          (Var x, Var y) | x == y -> return Env.emptyR
+          (Var x, Var y) | x == y -> return emptyR
           (Var y, yty)
             | Just (Var y') <- strengthenN p (Var y),
               Just yty' <- strengthenN p yty,
               not (y' `appearsFree` yty') ->
-                return (Env.singletonR (y', yty'))
+                return (singletonR (y', yty'))
           (yty, Var y)
             | Just (Var y') <- strengthenN p (Var y),
               Just yty' <- strengthenN p yty,
               not (y' `appearsFree` yty') ->
-                return (Env.singletonR (y', yty'))
+                return (singletonR (y', yty'))
           (DataCon n1 a1, DataCon n2 a2)
             | n1 == n2 -> goArgs p a1 a2
           (TyCon s1 tms1, TyCon s2 tms2)
             | s1 == s2 -> goArgs p tms1 tms2
           (Lam bnd1, Lam bnd2) -> do
-            push
+            Scope.push1u
               (L.getLocalName bnd1)
               (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
           (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
             ds1 <- go p tyA1 tyA2
             ds2 <-
-              push
+              Scope.push1u
                 (L.getLocalName bnd1)
                 (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
             joinR ds1 ds2 `Env.whenNothing` [DS "cannot join refinements"]
@@ -238,14 +250,14 @@ unify strict t1 t2 = do
             joinR ds1 ds2 `Env.whenNothing` [DS "cannot join refinements"]
           _ ->
             if not strict && (amb txnf || amb tynf)
-              then return Env.emptyR
+              then return emptyR
               else Env.err [DS "Cannot equate", DU txnf, DS "and", DU tynf]
     goArgs :: forall n p. (SNatI n) => SNat p -> [Term (p + n)] -> [Term (p + n)] -> TcMonad (p + n) (Refinement Term n)
     goArgs p (t1 : a1s) (t2 : a2s) = do
       ds <- go p t1 t2
       ds' <- goArgs p a1s a2s
       joinR ds ds' `Env.whenNothing` [DS "cannot join refinements"]
-    goArgs p [] [] = return Env.emptyR
+    goArgs p [] [] = return emptyR
     goArgs _ _ _ = Env.err [DS "internal error (unify)"]
 
 -- | Is a term "ambiguous" when it comes to unification?
@@ -280,3 +292,26 @@ patternMatchList (e1 : es) (PCons p1 ps) = do
   withSNat (size ps) $
     return (env2 .++ env1)
 patternMatchList _ _ = Env.err [DS "pattern match failure"]
+
+addRefinement :: forall t n a. (SNatI n, Shiftable t) => (Fin n, Term n) -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
+addRefinement (i, t) r = do
+  let i' = refine r (var @Term i)
+  let t' = refine r t
+  r' <- Env.mapScope (const Const) $ unify False i' t'
+  joinR r r'
+    `Env.whenNothing` [DS "BUG: cannot add refinement"]
+
+addRefinements :: forall t n a. (SNatI n, Shiftable t) => Refinement Term n -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
+addRefinements r' r = do
+  let e = fromRefinement r'
+  foldM (\r i -> addRefinement (i, applyE e (var i)) r) r (domain r')
+
+pushRefinements :: forall t n a. (SNatI n, Shiftable t) => Refinement Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
+pushRefinements nr m = do
+  ctx <- Scope.blob
+  ss <- Scope.scopeSize
+  r <- addRefinements nr (Env.refinement ctx)
+  local (\ctx -> ctx {Env.refinement = r}) m
+
+pushRefinement :: (SNatI n, Shiftable t) => (Fin n, Term n) -> Env.TcMonad t n a -> Env.TcMonad t n a
+pushRefinement nr = pushRefinements (singletonR nr)

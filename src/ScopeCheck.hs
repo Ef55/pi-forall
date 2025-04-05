@@ -15,6 +15,7 @@ import AutoEnv.Bind.Pat qualified as Pat
 import AutoEnv.Bind.Scoped ((<:>))
 import AutoEnv.Bind.Scoped qualified as Scoped
 import AutoEnv.Bind.Single qualified as B
+import AutoEnv.DependentScope qualified as DS
 import AutoEnv.Lib
 import AutoEnv.MonadScoped (ScopedReader)
 import AutoEnv.MonadScoped qualified as Scoped
@@ -300,19 +301,48 @@ instance Scoping Z C.Module S.Module where
           C.moduleConstructors = S.moduleConstructors m
         }
 
-instance Scoping Z (Vec n C.Term) (SNat n, AutoEnv.Env S.Term n n) where
-  scope' = iter AutoEnv.zeroE Nat.SZ
-    where
-      iter :: forall k m. AutoEnv.Ctx S.Term k -> SNat k -> Vec m C.Term -> Scope k (SNat (k + m), AutoEnv.Ctx S.Term (k + m))
-      iter ctx k Vec.VNil = case axiomPlusZ @k of Refl -> return (k, ctx)
-      iter ctx k (x Vec.::: (xs :: Vec m' C.Term)) = do
-        x' <- scope' x
-        let ctx' = ctx AutoEnv.+++ x'
-        case AutoEnv.axiomSus @k @m' of
-          Refl -> Scoped.push (LocalName $ show k) $ iter ctx' (withSNat k Nat.SS) xs
+-- instance Scoping Z (Vec n C.Term) (SNat n, AutoEnv.Env S.Term n n) where
+--   scope' = iter AutoEnv.zeroE Nat.SZ
+--     where
+--       iter :: forall k m. AutoEnv.Ctx S.Term k -> SNat k -> Vec m C.Term -> Scope k (SNat (k + m), AutoEnv.Ctx S.Term (k + m))
+--       iter ctx k Vec.VNil = case axiomPlusZ @k of Refl -> return (k, ctx)
+--       iter ctx k (x Vec.::: (xs :: Vec m' C.Term)) = do
+--         x' <- scope' x
+--         let ctx' = ctx AutoEnv.+++ x'
+--         case AutoEnv.axiomSus @k @m' of
+--           Refl -> Scoped.push (LocalName $ show k) $ iter ctx' (withSNat k Nat.SS) xs
 
-  unscope' (n, e) = do
-    let u = withSNat n $ Vec.universe @n
-        names = LocalName . show <$> u
-    case axiomPlusZ @n of
-      Refl -> Scoped.push names $ mapM (unscope' . AutoEnv.applyE e . S.Var) u
+--   unscope' (n, e) = do
+--     let u = withSNat n $ Vec.universe @n
+--         names = LocalName . show <$> u
+--     case axiomPlusZ @n of
+--       Refl -> Scoped.push names $ mapM (unscope' . AutoEnv.applyE e . S.Var) u
+
+instance Scoping n (Vec n C.Term) (SNat n, AutoEnv.Env S.Term n n) where
+  scope' v = Vec.withDict v $ do
+    iv <- mapM scope' v
+    let env = AutoEnv.fromTable $ Vec.toList $ Vec.imap (,) iv
+    return (snat, env)
+
+  unscope' (n, env) = do
+    let u :: Vec n (Fin n) = withSNat n Vec.universe
+        ts :: Vec n (S.Term n) = AutoEnv.applyE env . S.Var <$> u
+    mapM unscope' ts
+
+instance Scoping n (Vec p (LocalName, C.Term)) (SNat p, DS.Telescope LocalName S.Term p n) where
+  -- scope' Vec.VNil = return (SZ, DS.empty)
+  -- scope' ((hx, ht) Vec.::: t) = do
+  --   ht' :: S.Term n <- scope' ht
+  --   (p', t' :: DS.Telescope LocalName S.Term p' (S n)) <- DS.push1 (hx, ht') $ scope' t
+  --   let p = withSNat p SS
+  --   return $ case axiomAssoc of Refl -> (p, DS.TCons (hx, ht') t')
+  scope' v = error "TODO: implement"
+
+  -- iter :: Vec p (LocalName, C.Term) -> (DS.Telescope LocalName S.Term p n -> Scope (p + n) (DS.Telescope LocalName S.Term (S p) n)) -> DS.Telescope LocalName S.Term
+
+  unscope' (p, t) = do
+    let (p, v) = DS.fromTelescope @S.Term t
+        ns = fst <$> v
+        ts = snd <$> v
+    ts' <- withSNat p $ Scoped.pushVec ns $ mapM unscope' ts
+    return $ Vec.reverse $ Vec.zipWith (,) ns ts'

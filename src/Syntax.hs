@@ -10,9 +10,12 @@ import AutoEnv.Bind.Pat qualified as Pat
 import AutoEnv.Bind.Scoped (TeleList (..), (<:>))
 import AutoEnv.Bind.Scoped qualified as Scoped
 import AutoEnv.Bind.Single qualified as B
+import AutoEnv.DependentScope (WithData (..))
+import AutoEnv.DependentScope qualified as DS
 import AutoEnv.MonadScoped
 import Data.FinAux
 import Data.Maybe qualified as Maybe
+import Data.Scoped.Const
 import Data.Set qualified as Set
 import Data.Vec qualified as Vec
 import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
@@ -217,6 +220,10 @@ instance Named LocalName (Pattern p) where
   names (PatVar x) = x ::: VNil
   names (PatCon _ p) = names p
 
+instance WithData (Pattern p) LocalName Const k where
+  getData (PatCon _ ps) = getData ps
+  getData (PatVar x) = DS.singleton (x, Const)
+
 -- scoped patterns
 
 instance Sized (Local p n) where
@@ -233,12 +240,19 @@ instance Named LocalName (Local p n) where
   names (LocalDecl x _) = x ::: VNil
   names (LocalDef _ _) = VNil
 
+instance WithData (Local p k) LocalName Typ k where
+  getData (LocalDecl n t) = DS.singleton (n, t)
+  getData (LocalDef _ _) = DS.empty
+
 ----------------------------------------------
 --  Subst instances
 ----------------------------------------------
 
 instance SubstVar Term where
   var = Var
+
+instance Shiftable Term where
+  shift = shiftFromApplyE @Term
 
 instance Subst Term Term where
   applyE r TyType = TyType
@@ -260,6 +274,9 @@ instance Subst Term Term where
   applyE r TrustMe = TrustMe
   applyE r PrintMe = PrintMe
 
+instance Shiftable Match where
+  shift = shiftFromApplyE @Term
+
 instance Subst Term Match where
   applyE r (Branch (b :: Pat.Bind Term Term (Pattern p) n)) =
     Branch (applyE r b)
@@ -268,6 +285,9 @@ instance Subst Term Match where
 -- telescope are not satisifiable. So we define a
 -- special purpose substitution operation for that
 -- called doSubst in TypeCheck
+
+instance Shiftable (Local p) where
+  shift = shiftFromApplyE @Term
 
 instance Subst Term (Local p) where
   applyE r (LocalDecl ln t) =

@@ -9,7 +9,7 @@ data Log
 
 instance Show Log where
   show (Info s) = "info: " <> s
-  show (Warn s) = "warn: " <> s
+  show (Warn s) = "warn:\n" <> s
 
 isInfo :: Log -> Bool
 isInfo (Info _) = True
