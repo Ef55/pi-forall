@@ -108,7 +108,7 @@ reparse (ModuleInfo _ fileName _) = do
   put (C.moduleConstructors cmodu)
   case scope cmodu of
     Just m -> return m
-    Nothing -> error $ "scope checking failed"
+    Nothing -> error "scope checking failed"
 
 exitWith :: Either a b -> (a -> IO ()) -> IO b
 exitWith res f =
@@ -125,10 +125,10 @@ go str = do
       case ScopeCheck.scope term of
         Nothing -> putStrLn "scope check failed"
         Just (term' :: Term n) -> do
-          putStrLn $ "parsed and scope checked as"
+          putStrLn "parsed and scope checked as"
           putStrLn $ pp $ ScopeCheck.unscope term'
-          let (res, logs) = runTcMonad (inferType term' emptyContext)
-          mapM_ (putStr . show) logs
+          let (res, logs) = runTcMonad (inferType term')
+          mapM_ print logs
           case res of
             Left typeError -> putTypeError (displayErr typeError initDI)
             Right ty -> do
@@ -158,7 +158,7 @@ goFilename pathToMainFile = do
   val <- v `exitWith` putParseError
   putStrLn "type checking..."
   let (d, logs) = runTcMonad (tcModules val)
-  mapM_ (putStr . show) logs
+  mapM_ (putStrLn . show) logs
   defs <- d `exitWith` (putTypeError . flip displayErr initDI)
   putStrLn $ pp $ ScopeCheck.unscope (last defs)
 

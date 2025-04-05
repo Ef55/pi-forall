@@ -4,6 +4,7 @@ module PrettyPrint (Display (..), SourcePos, PP.Doc, pp, disp, DispInfo, initDI)
 import ConcreteSyntax
 import Control.Monad.Reader (MonadReader (ask, local), asks)
 import Data.FinAux qualified as Fin
+import Data.Foldable qualified as Foldable
 import Data.List as List
 import Data.LocalName (LocalName)
 import Data.LocalName qualified as LocalName
@@ -24,7 +25,6 @@ import Text.ParserCombinators.Parsec.Pos (SourcePos, sourceColumn, sourceLine, s
 -- 'Display' instances are only available for the "unscoped" representation of
 -- the language; see 'ScopeCheck' ('unscope' more specifically) to transform a
 -- scoped representation into an unscoped one for pretty-printing.
-
 class Display d where
   display :: d -> DispInfo -> Doc e
 
@@ -444,3 +444,17 @@ gatherBinders (Lam n body) = do
 gatherBinders body = do
   db <- display body
   return ([], db)
+
+
+-- displayFoldable :: Foldable f => String -> f Term -> DispInfo -> Doc e
+-- displayFoldable j t = do
+--   let il :: [(Int, Term)] = zip (iterate (1 +) 0) $ Foldable.toList t
+--   dl <-
+--     mapM
+--       ( \(i, t) -> do
+--           di <- display i
+--           dt <- display t
+--           return $ di <+> PP.pretty j <+> dt
+--       )
+--       il
+--   return $ PP.vcat dl
