@@ -90,6 +90,6 @@ tester testName path fileName k = testCase testName $ do
 tcFile :: [String] -> Bool -> String -> TestTree
 tcFile path positive name = tester (name ++ if positive then " [✔]" else " [✘]") path name $ \case
   ParsingFailure err -> assertFailure $ "Parsing error:" ++ show err
-  TypingFailure err -> assertFailure $ "Type error:" ++ show (displayErr err PP.initDI)
+  TypingFailure err -> assertFailure $ "Type error:\n" ++ show (displayErr err PP.initDI)
   TestSuccess _ logs@(_ : _) -> assertFailure $ "Warnings were produced:" ++ intercalate "\n" (fmap show logs)
   TestSuccess r [] -> return ()
