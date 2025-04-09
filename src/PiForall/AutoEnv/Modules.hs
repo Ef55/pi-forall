@@ -1,25 +1,25 @@
 {- pi-forall language -}
 
 -- | Tools for working with multiple source files
-module Modules (goFilename, getModules, ModuleInfo (..)) where
+module PiForall.AutoEnv.Modules (goFilename, getModules, ModuleInfo (..)) where
 
-import ConcreteSyntax qualified as C
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.Graph qualified as Gr
 import Data.List (nub, (\\))
-import Environment
-import Parser
-import PrettyPrint
-import ScopeCheck
-import Syntax
+import PiForall.AutoEnv.Environment
+import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
+import PiForall.AutoEnv.Syntax
+import PiForall.AutoEnv.TypeCheck
+import PiForall.ConcreteSyntax qualified as C
+import PiForall.Parser
+import PiForall.PrettyPrint
 import System.Directory
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath
 import Text.ParserCombinators.Parsec.Error (ParseError, errorPos)
-import TypeCheck
 
 -- import System.FilePath (splitFileName)
 
@@ -106,7 +106,7 @@ reparse (ModuleInfo _ fileName _) = do
   cnames <- get
   cmodu <- parseModuleFile cnames fileName
   put (C.moduleConstructors cmodu)
-  case scope cmodu of
+  case ScopeCheck.scope cmodu of
     Just m -> return m
     Nothing -> error "scope checking failed"
 

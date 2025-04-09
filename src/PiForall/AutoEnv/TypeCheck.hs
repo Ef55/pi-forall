@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module TypeCheck (tcModules, inferType, checkType) where
+module PiForall.AutoEnv.TypeCheck (tcModules, inferType, checkType) where
 
 import AutoEnv
 import AutoEnv.Bind.Local qualified as Local
@@ -26,14 +26,14 @@ import Data.Proxy (Proxy (..))
 import Data.SNat qualified as SNat
 import Data.Scoped.Const
 import Data.Vec qualified as Vec
-import Environment (Context, D (..))
-import Environment qualified as Env
-import Equal qualified
-import Log qualified
-import PrettyPrint (Display (..), disp, pp)
+import PiForall.Log qualified as Log
+import PiForall.AutoEnv.Environment (Context, D (..))
+import PiForall.AutoEnv.Environment qualified as Env
+import PiForall.AutoEnv.Equal qualified as Equal
+import PiForall.AutoEnv.ScopeCheck (Some1 (..))
+import PiForall.AutoEnv.Syntax
+import PiForall.PrettyPrint (Display (..), disp, pp)
 import Prettyprinter (pretty)
-import ScopeCheck (Some1 (..))
-import Syntax
 import Unsafe.Coerce qualified
 
 ---------------------------------------------------------------------

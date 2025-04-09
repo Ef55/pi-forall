@@ -17,7 +17,7 @@
 --
 -- A helper module to parse lexical elements (tokens). See 'makeTokenParser'
 -- for a description of how to use it.
-module LayoutToken
+module PiForall.LayoutToken
   ( LanguageDef,
     GenLanguageDef (..),
     TokenParser,

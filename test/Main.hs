@@ -2,22 +2,22 @@
 
 module Main where
 
-import Arbitrary (prop_roundtrip)
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe (isJust)
-import Environment
-import Environment qualified as Env
-import Equal qualified
-import Log qualified
-import Modules
-import PrettyPrint as PP
-import Syntax
+import PiForall.AutoEnv.Environment
+import PiForall.AutoEnv.Environment qualified as Env
+import PiForall.AutoEnv.Equal qualified as Equal
+import PiForall.Log qualified as Log
+import PiForall.AutoEnv.Modules
+import PiForall.PrettyPrint as PP
+import PiForall.AutoEnv.Syntax
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck qualified as QC
 import Text.ParserCombinators.Parsec.Error
-import TypeCheck
+import PiForall.AutoEnv.TypeCheck
+import ParseScopeRT
 
 --------------------------------------------------------------------------------
 -- Definition of tests to run

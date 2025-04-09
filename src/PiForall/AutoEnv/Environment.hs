@@ -1,4 +1,4 @@
-module Environment where
+module PiForall.AutoEnv.Environment where
 
 import AutoEnv
   ( Ctx,
@@ -8,6 +8,7 @@ import AutoEnv
     Nat (S, Z),
     Refinement,
     SNat,
+    Shiftable (..),
     Subst (applyE),
     applyEnv,
     emptyC,
@@ -15,12 +16,13 @@ import AutoEnv
     weakenE',
     withSNat,
     (+++),
-    type (+), Shiftable (..),
+    type (+),
   )
 import AutoEnv qualified
 import AutoEnv.Bind.Local qualified as Local
 import AutoEnv.Bind.Pat qualified as Pat
 import AutoEnv.DependentScope qualified as Scope
+import AutoEnv.Env (Shiftable, fromRefinement)
 import AutoEnv.MonadScoped qualified as SimpleScope
 import Control.Monad.Except
   ( ExceptT,
@@ -42,14 +44,13 @@ import Data.List qualified as List
 import Data.Maybe (listToMaybe)
 import Data.Type.Nat qualified as Nat
 import Data.Vec qualified as Vec
-import Log
-import PrettyPrint
+import PiForall.Log
+import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
+import PiForall.AutoEnv.Syntax
+import PiForall.PrettyPrint
 import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
 import Prettyprinter qualified as PP
-import ScopeCheck qualified
-import Syntax
 import Text.ParserCombinators.Parsec.Pos (SourcePos)
-import AutoEnv.Env (fromRefinement, Shiftable)
 
 -------------------------------------------------------
 
