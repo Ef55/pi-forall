@@ -1,5 +1,5 @@
 -- | A parsec-based parser for the concrete syntax
-module Parser
+module PiForall.Parser
   ( parseModuleFile,
     parseModuleImports,
     parseExpr,
@@ -9,7 +9,7 @@ module Parser
   )
 where
 
-import ConcreteSyntax hiding (ModuleImport, moduleImports)
+import PiForall.ConcreteSyntax hiding (moduleImports)
 import Control.Monad (forM_, void)
 import Control.Monad.Except (MonadError (throwError))
 import Control.Monad.State.Lazy hiding (join)
@@ -17,9 +17,7 @@ import Data.Functor (($>))
 import Data.List (foldl')
 import Data.LocalName
 import Data.Set qualified as S
-import LayoutToken qualified as Token
-import Syntax (ConstructorNames (..), ModuleImport (..), initialConstructorNames)
-import Syntax qualified as Syntax
+import PiForall.LayoutToken qualified as Token
 import Text.Parsec hiding (Empty, State)
 import Text.Parsec.Expr (Assoc (..), Operator (..), buildExpressionParser)
 
@@ -119,7 +117,7 @@ liftError (Right a) = return a
 -- | Parse a module declaration from the given filepath.
 parseModuleFile ::
   (MonadError ParseError m, MonadIO m) =>
-  Syntax.ConstructorNames ->
+  ConstructorNames ->
   String ->
   m Module
 parseModuleFile cnames name = do
@@ -136,7 +134,7 @@ parseModuleImports name = do
       runParserT (do whiteSpace; moduleImports) [] name contents
 
 -- | Test an 'LParser' on a String.
-testParser :: Syntax.ConstructorNames -> LParser t -> String -> Either ParseError t
+testParser :: ConstructorNames -> LParser t -> String -> Either ParseError t
 testParser cn parser str =
   flip evalState cn $
     runParserT (do whiteSpace; v <- parser; eof; return v) [] "<interactive>" str
@@ -151,7 +149,7 @@ type LParser a =
   ParsecT
     String -- The input is a sequence of Char
     [Column] -- The internal state for Layout tabs
-    (State Syntax.ConstructorNames)
+    (State ConstructorNames)
     a -- the type of the object being parsed
 
 -- Based on Parsec's haskellStyle (which we can not use directly since
@@ -200,7 +198,7 @@ piforallStyle =
         ["!", "?", "\\", ":", ".", ",", "<", "=", "+", "-", "*", "^", "()", "_", "|", "{", "}"]
     }
 
-tokenizer :: Token.GenTokenParser String [Column] (State Syntax.ConstructorNames)
+tokenizer :: Token.GenTokenParser String [Column] (State ConstructorNames)
 layout :: forall a t. LParser a -> LParser t -> LParser [a]
 (tokenizer, Token.LayFun layout) = Token.makeTokenParser piforallStyle "{" ";" "}"
 
@@ -395,7 +393,6 @@ valDef = do
 failDef = do
   reserved "fail"
   ModuleFail <$> decl
-
 
 ------------------------
 ------------------------

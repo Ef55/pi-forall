@@ -4,5 +4,5 @@ packages:
 - .
 extra-deps:
 - github: Ef55/autoenv
-  commit: 14c772156c30052b4472349886074905773a50f0
+  commit: 49eb9f0123e38def135bace4e057c24e8a010843
 notify-if-nix-on-path: false

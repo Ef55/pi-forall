@@ -1,4 +1,4 @@
-module Log (Log (..), isInfo) where
+module PiForall.Log (Log (..), isInfo) where
 
 import Control.Monad.Writer (MonadWriter (tell))
 import Data.List qualified as List

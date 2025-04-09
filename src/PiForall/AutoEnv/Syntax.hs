@@ -2,7 +2,16 @@
 -- This version distinguishes between global and local names
 -- Global names are strings (which must be unique). Local names
 -- are represented by indices.
-module Syntax where
+module PiForall.AutoEnv.Syntax
+  ( module PiForall.AutoEnv.Syntax,
+    GlobalName,
+    ConstructorNames (..),
+    TyConName (..),
+    DataConName (..),
+    ModuleImport (..),
+    ModuleName (..),
+  )
+where
 
 import AutoEnv
 import AutoEnv.Bind.Local qualified as Local
@@ -18,18 +27,9 @@ import Data.Maybe qualified as Maybe
 import Data.Scoped.Const
 import Data.Set qualified as Set
 import Data.Vec qualified as Vec
+import PiForall.ConcreteSyntax (ConstructorNames (..), DataConName, GlobalName, ModuleImport (..), ModuleName, TyConName)
 import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
 import Unsafe.Coerce (unsafeCoerce)
-
--- | names of top level declarations/definitions
--- must be unique
-type GlobalName = String
-
--- | names of type constructors, like 'list'
-type TyConName = String
-
--- | names of data constructors, like 'cons'
-type DataConName = String
 
 -- | types and terms (combined syntax)
 type Typ = Term
@@ -102,21 +102,12 @@ data ScopedConstructorDef
   = forall n.
     ScopedConstructorDef (Telescope n Z) (ConstructorDef n)
 
--- | The names of all type/data constructors used in the module
-data ConstructorNames = ConstructorNames
-  { tconNames :: Set.Set TyConName,
-    dconNames :: Set.Set DataConName
-  }
-
 -- Toplevel components of modules
 data ModuleEntry
   = ModuleDecl {declName :: GlobalName, declType :: Typ Z}
   | ModuleDef {declName :: GlobalName, declTerm :: Term Z}
   | ModuleData {declName :: GlobalName, declData :: DataDef}
   | ModuleFail {failing :: ModuleEntry}
-
--- | module names
-type ModuleName = String
 
 -- | A Module has a name, a list of imports, a list of declarations,
 --   and a set of constructor names (which affect parsing).
@@ -126,11 +117,6 @@ data Module = Module
     moduleEntries :: [ModuleEntry],
     moduleConstructors :: ConstructorNames
   }
-
--- | References to other modules (brings their declarations and
--- definitions into the global scope)
-newtype ModuleImport = ModuleImport ModuleName
-  deriving (Show, Eq, Ord)
 
 -------------------------------------------------------
 
