@@ -6,7 +6,16 @@
 -- Stability   : experimental
 --
 -- This module demonstrates a translation from unscoped to well-scoped terms
-module ScopeCheck (Some1 (..), Scoping (..), scopeUnder, unscopeUnder, scope, unscope, unscopePattern) where
+module PiForall.AutoEnv.ScopeCheck
+  ( Some1 (..),
+    Scoping (..),
+    scopeUnder,
+    unscopeUnder,
+    scope,
+    unscope,
+    unscopePattern,
+  )
+where
 
 import AutoEnv qualified
 import AutoEnv.Bind.Local qualified as L
@@ -19,7 +28,6 @@ import AutoEnv.DependentScope qualified as DS
 import AutoEnv.Lib
 import AutoEnv.MonadScoped (ScopedReader)
 import AutoEnv.MonadScoped qualified as Scoped
-import ConcreteSyntax qualified as C
 import Control.Monad (foldM)
 import Control.Monad qualified as Monad
 import Control.Monad.Reader (MonadReader (ask), Reader, asks, runReader)
@@ -29,7 +37,8 @@ import Data.Maybe (fromJust)
 import Data.Maybe qualified as Maybe
 import Data.Type.Nat qualified as Nat
 import Data.Vec qualified as Vec
-import Syntax qualified as S
+import PiForall.AutoEnv.Syntax qualified as S
+import PiForall.ConcreteSyntax qualified as C
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------

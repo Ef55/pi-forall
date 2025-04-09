@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module Equal where
+module PiForall.AutoEnv.Equal where
 
 import AutoEnv
 import AutoEnv.Bind.Local as L
@@ -15,13 +15,13 @@ import Control.Monad.Reader (MonadReader, ReaderT)
 import Control.Monad.Writer (MonadWriter, Writer)
 import Data.SNat qualified as SNat
 import Data.Scoped.Const
-import Environment (Context, D (..))
-import Environment qualified as Env
-import Log (Log)
-import PrettyPrint
+import PiForall.AutoEnv.Environment (Context, D (..))
+import PiForall.AutoEnv.Environment qualified as Env
+import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
+import PiForall.AutoEnv.Syntax
+import PiForall.Log (Log)
+import PiForall.PrettyPrint
 import Prettyprinter as PP
-import ScopeCheck qualified
-import Syntax
 
 type TcMonad = Env.TcMonad Const
 

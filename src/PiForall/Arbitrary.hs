@@ -1,15 +1,13 @@
 -- | This module is for testing the parser/pretty printer.
 -- We would like to satisfy the following roundtrip property:
 --     * if we generate a random AST term and print it, then it should parse back to an alpha-equivalent term
-module Arbitrary where
+module PiForall.Arbitrary where
 
-import ConcreteSyntax
 import Data.LocalName
 import Data.Set qualified as Set
-import Parser (expr, testParser)
-import PrettyPrint
-import ScopeCheck
-import Syntax (ConstructorNames (..))
+import Data.Vec qualified as Vec
+import PiForall.ConcreteSyntax
+import PiForall.PrettyPrint
 import Test.QuickCheck
   ( Arbitrary (arbitrary),
     Gen,
@@ -18,36 +16,6 @@ import Test.QuickCheck
     sized,
   )
 import Test.QuickCheck qualified as QC
-import Text.Parsec.Error (ParseError)
-import qualified Data.Vec as Vec
-
--- | Round trip property: a given term prints then parses to the same term.
-prop_roundtrip :: Term -> QC.Property
-prop_roundtrip tm
-  | Just stm <- ScopeCheck.scope tm =
-      let str = pp $ ScopeCheck.unscope stm
-       in case test_parseExpr str of
-            Left err -> QC.counterexample ("*** Could not parse:\n" ++ str ++ "\n" ++ show err) False
-            Right tm' ->
-              case scope tm' of
-                Just stm' ->
-                  QC.counterexample
-                    ( "*** Round trip failure! Parsing:\n"
-                        ++ str
-                        ++ "\n** printed from \n"
-                        ++ show stm
-                        ++ "\n*** results in\n"
-                        ++ show stm'
-                        ++ "\n*** printed as\n"
-                        ++ pp (ScopeCheck.unscope  stm')
-                    )
-                    (stm == stm')
-                Nothing ->
-                  QC.counterexample "*** Round trip failure! ScopeCheck result of parsing" False
-  | otherwise = QC.property False
-
-test_parseExpr :: String -> Either Text.Parsec.Error.ParseError Term
-test_parseExpr = testParser arbConstructorNames expr
 
 -- View random terms
 -- sampleTerms :: IO ()

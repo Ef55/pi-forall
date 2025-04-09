@@ -1,10 +1,9 @@
-module ConcreteSyntax where
+module PiForall.ConcreteSyntax where
 
 import Data.LocalName
 import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Syntax (ConstructorNames, ModuleImport (..))
 import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
 
 -- | names of top level declarations/definitions
@@ -16,6 +15,12 @@ type TyConName = String
 
 -- | names of data constructors, like 'cons'
 type DataConName = String
+
+-- | The names of all type/data constructors used in the module
+data ConstructorNames = ConstructorNames
+  { tconNames :: Set.Set TyConName,
+    dconNames :: Set.Set DataConName
+  }
 
 type Typ = Term
 
@@ -98,6 +103,11 @@ newtype ScopedConstructorDef
 -- | module names
 type ModuleName = String
 
+-- | References to other modules (brings their declarations and
+-- definitions into the global scope)
+newtype ModuleImport = ModuleImport ModuleName
+  deriving (Show, Eq, Ord)
+
 -- | A Module has a name, a list of imports, a list of declarations,
 --   and a set of constructor names (which affect parsing).
 data Module = Module
@@ -137,3 +147,14 @@ unPos _ = Nothing
 -- | Tries to find a Pos inside a term, otherwise just gives up.
 unPosFlaky :: Term -> SourcePos
 unPosFlaky t = Maybe.fromMaybe (newPos "unknown location" 0 0) (unPos t)
+
+-------------------------------------------------------
+-- Prelude datatypes
+-------------------------------------------------------
+
+initialConstructorNames :: ConstructorNames
+initialConstructorNames =
+  ConstructorNames
+    { tconNames = Set.fromList ["Unit", "Bool", "Either", "Sigma"],
+      dconNames = Set.fromList ["()", "True", "False", "Left", "Right", "Prod"]
+    }

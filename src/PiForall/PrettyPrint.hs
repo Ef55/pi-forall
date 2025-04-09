@@ -1,7 +1,16 @@
 -- | A Pretty Printer.
-module PrettyPrint (Display (..), SourcePos, PP.Doc, pp, disp, DispInfo, initDI) where
+module PiForall.PrettyPrint
+  ( Display (..),
+    SourcePos,
+    PP.Doc,
+    pp,
+    disp,
+    DispInfo,
+    initDI,
+  )
+where
 
-import ConcreteSyntax
+import PiForall.ConcreteSyntax
 import Control.Monad.Reader (MonadReader (ask, local), asks)
 import Data.FinAux qualified as Fin
 import Data.Foldable qualified as Foldable
@@ -12,7 +21,6 @@ import Data.Map qualified as Map
 import Data.Set qualified as S
 import Prettyprinter (Doc, (<+>))
 import Prettyprinter qualified as PP
-import Syntax (ConstructorNames, ModuleImport (..))
 import Text.ParserCombinators.Parsec.Error (ParseError)
 import Text.ParserCombinators.Parsec.Pos (SourcePos, sourceColumn, sourceLine, sourceName)
 
@@ -444,7 +452,6 @@ gatherBinders (Lam n body) = do
 gatherBinders body = do
   db <- display body
   return ([], db)
-
 
 -- displayFoldable :: Foldable f => String -> f Term -> DispInfo -> Doc e
 -- displayFoldable j t = do

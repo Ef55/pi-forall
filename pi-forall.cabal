@@ -55,18 +55,18 @@ library
   import:
       common-stanza
   exposed-modules:
-        Arbitrary
-      , Syntax
-      , ConcreteSyntax
-      , Environment
-      , Equal
-      , PrettyPrint
-      , LayoutToken
-      , Parser
-      , ScopeCheck
-      , Modules
-      , TypeCheck
-      , Log
+        PiForall.PrettyPrint
+      , PiForall.LayoutToken
+      , PiForall.Parser
+      , PiForall.Log
+      , PiForall.ConcreteSyntax
+      , PiForall.Arbitrary
+      , PiForall.AutoEnv.Syntax
+      , PiForall.AutoEnv.Environment
+      , PiForall.AutoEnv.Equal
+      , PiForall.AutoEnv.ScopeCheck
+      , PiForall.AutoEnv.Modules
+      , PiForall.AutoEnv.TypeCheck
   hs-source-dirs:
       src
 
@@ -80,6 +80,8 @@ test-suite test-pi-forall
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
+  other-modules:
+    ParseScopeRT
 
 benchmark bench-pi-forall
   import: common-stanza
