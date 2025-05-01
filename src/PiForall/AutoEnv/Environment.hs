@@ -16,7 +16,7 @@ import AutoEnv
     weakenE',
     withSNat,
     (+++),
-    type (+),
+    type (+), SubstVar,
   )
 import AutoEnv qualified
 import AutoEnv.Bind.Local qualified as Local
@@ -74,7 +74,7 @@ data TcEnv n = TcEnv
 instance Shiftable TcEnv where
   shift k (TcEnv globals hints sourceLocation refinement) = TcEnv globals hints sourceLocation (shift k refinement)
 
-type Scope t n = Scope.Scope LocalName t n
+type Scope t n = Scope.Scope LocalName t n Z
 
 type MonadScoped t = Scope.MonadScoped LocalName t TcEnv
 
@@ -85,14 +85,14 @@ newtype TcMonad t n a = TcMonad (Scope.ScopedReaderT LocalName t TcEnv (ExceptT 
   deriving (Functor, Applicative, Monad, MonadError Err, MonadWriter [Log])
 
 -- Find how to make it derivable
-instance (Shiftable t) => Scope.MonadScoped LocalName t TcEnv (TcMonad t) where
+instance (SubstVar t) => Scope.MonadScoped LocalName t TcEnv (TcMonad t) where
   scope' = TcMonad Scope.scope'
-  pushTelescope ext (TcMonad m) = TcMonad $ Scope.pushTelescope ext m
+  pushEnv ext (TcMonad m) = TcMonad $ Scope.pushEnv ext m
   blob = TcMonad Scope.blob
   local f (TcMonad m) = TcMonad $ Scope.local f m
 
 mapScope :: (forall n. s n -> s' n) -> TcMonad s' n a -> TcMonad s n a
-mapScope f (TcMonad m) = TcMonad $ Scope.mapScope (\u s -> (u, f s)) m
+mapScope f (TcMonad m) = TcMonad $ Scope.mapScope id f m
 
 -- | Entry point for the type checking monad, given an
 -- initial environment, returns either an error message
@@ -143,7 +143,7 @@ lookupHint v = do
   hints <- hints <$> Scope.blob
   return $ listToMaybe [weakenClosed ty | (x, ty) <- hints, v == x]
 
-lookupGlobalTy :: (Shiftable t) => GlobalName -> TcMonad t n (Typ n)
+lookupGlobalTy :: (SubstVar t) => GlobalName -> TcMonad t n (Typ n)
 lookupGlobalTy v = do
   env <- Scope.blob
   case [a | ModuleDecl v' a <- globals env, v == v'] of
@@ -154,7 +154,7 @@ lookupGlobalTy v = do
         Just ty -> return ty
         Nothing -> err [DS $ "The variable " ++ show v ++ " was not found"]
 
-lookupGlobalDef :: (Shiftable t) => GlobalName -> TcMonad t n (Term n)
+lookupGlobalDef :: (SubstVar t) => GlobalName -> TcMonad t n (Term n)
 lookupGlobalDef v = do
   env <- Scope.blob
   case [a | ModuleDef v' a <- globals env, v == v'] of
@@ -166,7 +166,7 @@ lookupGlobalDef v = do
         ]
 
 -- | Find the datatype declaration of a type constructor in the context
-lookupTCon :: (Shiftable t) => TyConName -> TcMonad t n DataDef
+lookupTCon :: (SubstVar t) => TyConName -> TcMonad t n DataDef
 lookupTCon v = do
   g <- globals <$> Scope.blob
   scanGamma g
@@ -189,7 +189,7 @@ lookupTCon v = do
 -- | Find a data constructor in the context, returns a list of
 -- all potential matches
 lookupDConAll ::
-  (Shiftable t) =>
+  (SubstVar t) =>
   DataConName ->
   TcMonad t n [(TyConName, ScopedConstructorDef)]
 lookupDConAll v = do
@@ -213,7 +213,7 @@ lookupDConAll v = do
 -- construct, find the telescopes for its parameters and arguments.
 -- Throws an error if the data constructor cannot be found for that type.
 lookupDCon ::
-  (Shiftable t) =>
+  (SubstVar t) =>
   DataConName ->
   TyConName ->
   TcMonad t n ScopedConstructorDef
@@ -294,10 +294,10 @@ extendLocal :: Local p n -> (Context (p + n) -> m a) -> (Context n -> m a)
 extendLocal (LocalDecl x t) k ctx = k (extendTy t ctx)
 extendLocal (LocalDef x u) k ctx = error "TODO: local definitions unsupported"
 
-getRefinement :: (Shiftable t) => TcMonad t n (Refinement Term n)
+getRefinement :: (SubstVar t) => TcMonad t n (Refinement Term n)
 getRefinement = refinement <$> Scope.blob
 
-refine :: (Shiftable t) => Term n -> TcMonad t n (Term n)
+refine :: (SubstVar t) => Term n -> TcMonad t n (Term n)
 refine t = do
   r <- getRefinement
   Scope.withScopeSize $ return $ AutoEnv.refine r t
@@ -350,13 +350,13 @@ data D n
   | DR (Refinement Term n)
 
 scopedDisplay :: (ScopeCheck.Scoping n u s, Display u) => s -> (SNat n, Scope o n) -> Doc ()
-scopedDisplay t (n, s) =
+scopedDisplay t (n, Scope.Scope sc _) =
   withSNat n $
-    let sc = Scope.projectScope s
+    let -- sc = Scope.projectScope s
         t' = withSNat (Vec.vlength sc) ScopeCheck.unscopeUnder sc t
      in disp t'
 
-sdisplay :: (Shiftable t) => D n -> DispInfo -> TcMonad t n (Doc ())
+sdisplay :: (SubstVar t) => D n -> DispInfo -> TcMonad t n (Doc ())
 sdisplay (DS s) di = return $ PP.pretty s
 sdisplay (DD d) di = return d
 sdisplay (DC c) di = return $ disp c
@@ -364,7 +364,7 @@ sdisplay (DU s) di = scopedDisplay s <$> Scope.scope'
 sdisplay (DZ s) di = return $ scopedDisplay s (Nat.SZ, Scope.empty)
 sdisplay (DR r) di = do
   ss <- Scope.scopeSize
-  s <- Scope.projectScope <$> Scope.scope
+  s <- Scope.uscope <$> Scope.scope
   let r' = withSNat ss $ fromRefinement r
   let t' = toList $ withSNat ss $ ScopeCheck.unscopeUnder s (ss, r')
   let c :: [Doc ()] = (\(i, t) -> disp i <+> PP.pretty "|-->" <+> disp t) <$> zip (toList s) t'
@@ -385,7 +385,7 @@ displayRefinement = DR <$> getRefinement
 -- TODO: preserve passed in di for printing the term???
 displayErr :: Err -> DispInfo -> Doc ()
 displayErr (Err [] msg) di = msg
-displayErr (Err ((SourceLocation p term s) : ss) msg) di =
+displayErr (Err ((SourceLocation p term s) : _) msg) di =
   display p di
     <+> nest 2 msg
     <+> nest
@@ -395,27 +395,27 @@ displayErr (Err ((SourceLocation p term s) : ss) msg) di =
       )
 
 -- | Print a warning
-warn :: (Shiftable t) => [D n] -> TcMonad t n ()
+warn :: (SubstVar t) => [D n] -> TcMonad t n ()
 warn d = do
   loc <- getSourceLocation
   msg <- mapM (`sdisplay` initDI) d
   tell $ List.singleton $ Warn $ show $ vcat msg
 
 -- | Print an error, making sure that the scope lines up
-err :: (Shiftable t) => [D n] -> TcMonad t n b
+err :: (SubstVar t) => [D n] -> TcMonad t n b
 err d = do
   loc <- getSourceLocation
   msg <- mapM (`sdisplay` initDI) d
   throwError $ Err loc (sep msg)
 
 -- | Augment an error message with addition information (if thrown)
-extendErr :: (Shiftable t) => TcMonad t n a -> [D n] -> TcMonad t n a
+extendErr :: (SubstVar t) => TcMonad t n a -> [D n] -> TcMonad t n a
 extendErr ma d =
   ma `catchError` \(Err ps msg) -> do
     msg' <- mapM (`sdisplay` initDI) d
     throwError $ Err ps (vcat [msg, sep msg'])
 
-whenNothing :: (Shiftable t) => Maybe a -> [D n] -> TcMonad t n a
+whenNothing :: (SubstVar t) => Maybe a -> [D n] -> TcMonad t n a
 whenNothing x msg =
   case x of
     Just r -> return r
