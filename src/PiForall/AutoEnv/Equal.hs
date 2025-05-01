@@ -293,7 +293,7 @@ patternMatchList (e1 : es) (PCons p1 ps) = do
     return (env2 .++ env1)
 patternMatchList _ _ = Env.err [DS "pattern match failure"]
 
-addRefinement :: forall t n a. (SNatI n, Shiftable t) => (Fin n, Term n) -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
+addRefinement :: forall t n a. (SNatI n, SubstVar t) => (Fin n, Term n) -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
 addRefinement (i, t) r = do
   let i' = refine r (var @Term i)
   let t' = refine r t
@@ -301,17 +301,17 @@ addRefinement (i, t) r = do
   joinR r r'
     `Env.whenNothing` [DS "BUG: cannot add refinement"]
 
-addRefinements :: forall t n a. (SNatI n, Shiftable t) => Refinement Term n -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
+addRefinements :: forall t n a. (SNatI n, SubstVar t) => Refinement Term n -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
 addRefinements r' r = do
   let e = fromRefinement r'
   foldM (\r i -> addRefinement (i, applyE e (var i)) r) r (domain r')
 
-pushRefinements :: forall t n a. (SNatI n, Shiftable t) => Refinement Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
+pushRefinements :: forall t n a. (SNatI n, SubstVar t) => Refinement Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
 pushRefinements nr m = do
   ctx <- Scope.blob
   ss <- Scope.scopeSize
   r <- addRefinements nr (Env.refinement ctx)
   local (\ctx -> ctx {Env.refinement = r}) m
 
-pushRefinement :: (SNatI n, Shiftable t) => (Fin n, Term n) -> Env.TcMonad t n a -> Env.TcMonad t n a
-pushRefinement nr = pushRefinements (singletonR nr)
+pushRefinement :: (SNatI n, SubstVar t) => Fin n -> Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
+pushRefinement l r = pushRefinements (singletonR (l, r))

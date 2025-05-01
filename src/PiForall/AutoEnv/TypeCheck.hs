@@ -52,7 +52,7 @@ inferType a = case a of
   (Pi tyA bnd) -> do
     tcType tyA
     let (x, tyB) = Local.unbindl bnd
-    Scope.push1 (x, tyA) $ tcType tyB
+    Scope.push1 x tyA $ tcType tyB
     return TyType
 
   -- i-app
@@ -148,7 +148,7 @@ checkType tm ty = do
       -- unbind the variables in the lambda expression and pi type
       let tyB = Local.getBody bnd2
       -- check the type of the body of the lambda expression
-      Scope.push1 (x, tyA) $ checkType body tyB
+      Scope.push1 x tyA $ checkType body tyB
 
     -- Practicalities
     (Pos p a) ->
@@ -174,8 +174,8 @@ checkType tm ty = do
       let ty'' = applyE @Term shift1E ty'
       let a' = applyE @Term shift1E a
       Scope.withScopeSize $
-        Scope.push1 (x, tyA) $
-          Equal.pushRefinement (FZ, a') $
+        Scope.push1 x tyA $
+          Equal.pushRefinement FZ a' $
             checkType b ty''
     TmRefl -> do
       (a, b) <- Env.mapScope (const Const) $ Equal.ensureEq ty
@@ -256,7 +256,7 @@ checkType tm ty = do
 
           -- add variables from pattern to context
           (pat, tm', rPat) <- declarePat pat (TyCon c args)
-          Scope.pushTelescope pat $ do
+          Scope.pushEnv pat $ do
             -- compare scrutinee and pattern: fails if branch is inaccessible
             rScrut <- Env.mapScope (const Const) $ Equal.unify False scrut'' tm'
 
@@ -314,10 +314,10 @@ tcTypeTele TNil = return ()
 tcTypeTele (TCons (LocalDef x tm) (tele :: Telescope p2 n)) = do
   ty1 <- inferType (Var x)
   checkType tm ty1
-  Scope.withScopeSize $ Equal.pushRefinement (x, tm) $ tcTypeTele tele
+  Scope.withScopeSize $ Equal.pushRefinement x tm $ tcTypeTele tele
 tcTypeTele (TCons (LocalDecl x ty) (tl :: Telescope p2 (S n))) = do
   tcType ty
-  Scope.push1 (x, ty) $ tcTypeTele tl
+  Scope.push1 x ty $ tcTypeTele tl
 
 -- | type check a list of data constructor arguments against a telescope,
 -- returning a substitution for each of the variables bound in the
@@ -422,7 +422,7 @@ doSubstRec strict k r (TCons e (t :: Telescope p2 m)) = case e of
   LocalDecl nm (ty :: Term ((k + q) + n)) -> do
     let ty' :: Term (k + n)
         ty' = applyE r ty
-    t' <- Scope.push1 (nm, ty') $ doSubstRec @q @n strict (SNat.succ k) (up r) t
+    t' <- Scope.push1 nm ty' $ doSubstRec @q @n strict (SNat.succ k) (up r) t
     return $ LocalDecl nm ty' <:> t'
 
 appendDefs :: Refinement Term n -> Telescope p n -> Telescope p n
@@ -440,9 +440,9 @@ declarePat ::
   forall p n.
   Pattern p ->
   Typ n ->
-  TcMonad n (Scope.Telescope LocalName Typ p n, Term (p + n), Refinement Term (p + n))
+  TcMonad n (Scope.Scope LocalName Typ p n, Term (p + n), Refinement Term (p + n))
 declarePat (PatVar x) ty = do
-  pure (Scope.singleton (x, ty), Var Fin.f0, emptyR)
+  pure (Scope.singleton x ty, Var Fin.f0, emptyR)
 declarePat p@(PatCon dc (pats :: PatList Pattern p)) ty = do
   (tc, params) <- Env.mapScope (const Const) $ Equal.ensureTCon ty
   ScopedConstructorDef (delta :: Telescope p1 'Z) (ConstructorDef cn (thetai :: Telescope p2 p1)) <- Env.lookupDCon dc tc
@@ -467,7 +467,7 @@ declarePats ::
   forall p pt n.
   PatList Pattern p ->
   Telescope pt n ->
-  TcMonad n (Scope.Telescope LocalName Typ p n, [Term (p + n)], Refinement Term (p + n))
+  TcMonad n (Scope.Scope LocalName Typ p n, [Term (p + n)], Refinement Term (p + n))
 declarePats pats (TCons (LocalDef x ty) (tele :: Telescope p1 n)) = do
   case axiomPlusZ @p1 of
     Refl -> do
@@ -495,10 +495,10 @@ declarePats
               ss = Scoped.instantiateWeakenEnv sp1 s tm
           let tele' :: Telescope p3 (p1 + n)
               tele' = applyE ss tele2
-          (defs2, tms :: [Term (p2 + (p1 + n))], rf2 :: Refinement Term (p2 + (p1 + n))) <- Scope.pushTelescope defs1 $ declarePats @p2 @p3 @(p1 + n) p2 tele'
-          -- withSNat (sPlus (size p2) (sPlus (size p1) (scope_size s))) $
-          let (p2, ctx) = Scope.append defs2 defs1
-          case withSNat (sPlus p2 (sPlus sp1 s)) $ joinR (shift (size p2) rf1) rf2 of
+          (defs2, tms :: [Term (p2 + (p1 + n))], rf2 :: Refinement Term (p2 + (p1 + n))) <- Scope.push defs1 $ declarePats @p2 @p3 @(p1 + n) p2 tele'
+          let sp2 = size p2
+          let ctx = Scope.append defs1 defs2
+          case withSNat (sPlus sp2 (sPlus sp1 s)) $ joinR (shift (size p2) rf1) rf2 of
             Just rf -> return (ctx, applyE @Term (shiftNE (size p2)) tm : tms, rf)
             Nothing -> Env.err [DS "cannot create refinement"]
 declarePats PNil TNil = return (Scope.empty, [], emptyR)
@@ -570,13 +570,13 @@ tcEntry (ModuleDef n term) =
             return $ AddCtx [ModuleDecl n ty, ModuleDef n term]
           Just ty -> do
             let decl = ModuleDecl n ty
-            Env.extendCtx decl $ checkType term ty
-            return (AddCtx [decl, ModuleDef n term])
+            (Env.extendCtx decl $ checkType term ty)
               `Env.extendErr` [ DS "When checking the term",
                                 DU term,
                                 DS "against the type",
                                 DZ decl
                               ]
+            return (AddCtx [decl, ModuleDef n term])
       Right term' ->
         Env.extendSourceLocation
           (unPosFlaky term)

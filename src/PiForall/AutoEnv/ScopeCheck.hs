@@ -338,7 +338,7 @@ instance Scoping n (Vec n C.Term) (SNat n, AutoEnv.Env S.Term n n) where
         ts :: Vec n (S.Term n) = AutoEnv.applyE env . S.Var <$> u
     mapM unscope' ts
 
-instance Scoping n (Vec p (LocalName, C.Term)) (SNat p, DS.Telescope LocalName S.Term p n) where
+instance Scoping n (Vec p (LocalName, C.Term)) (SNat p, DS.Scope LocalName S.Term p n) where
   -- scope' Vec.VNil = return (SZ, DS.empty)
   -- scope' ((hx, ht) Vec.::: t) = do
   --   ht' :: S.Term n <- scope' ht
@@ -349,9 +349,11 @@ instance Scoping n (Vec p (LocalName, C.Term)) (SNat p, DS.Telescope LocalName S
 
   -- iter :: Vec p (LocalName, C.Term) -> (DS.Telescope LocalName S.Term p n -> Scope (p + n) (DS.Telescope LocalName S.Term (S p) n)) -> DS.Telescope LocalName S.Term
 
-  unscope' (p, t) = do
-    let (p, v) = DS.fromTelescope @S.Term t
-        ns = fst <$> v
-        ts = snd <$> v
-    ts' <- withSNat p $ Scoped.pushVec ns $ mapM unscope' ts
+  unscope' (p, DS.Scope ns ts) = do
+    let --(p, v) = DS.fromScope @S.Term t
+        -- v = fst t
+        -- ns = fst <$> v
+        -- ts = snd <$> v
+        ts' = AutoEnv.toVec p ts
+    ts' <- withSNat p $ Scoped.pushVec ns $ mapM unscope' ts'
     return $ Vec.reverse $ Vec.zipWith (,) ns ts'

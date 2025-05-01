@@ -37,6 +37,7 @@ common common-stanza
     , vty
     , fin
     , vec
+    , unbound-generics
   default-language:
     GHC2021
   default-extensions:
@@ -67,6 +68,12 @@ library
       , PiForall.AutoEnv.ScopeCheck
       , PiForall.AutoEnv.Modules
       , PiForall.AutoEnv.TypeCheck
+      , PiForall.Unbound.Syntax
+      , PiForall.Unbound.Environment
+      , PiForall.Unbound.Equal
+      , PiForall.Unbound.NameResolution
+      , PiForall.Unbound.Modules
+      , PiForall.Unbound.TypeCheck
   hs-source-dirs:
       src
 
