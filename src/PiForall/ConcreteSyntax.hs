@@ -1,3 +1,5 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module PiForall.ConcreteSyntax where
 
 import Data.LocalName
@@ -5,6 +7,12 @@ import Data.Maybe qualified as Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
+
+-- For the unbound version
+import GHC.Generics (Generic,from)
+import Unbound.Generics.LocallyNameless qualified as Unbound
+import Data.Typeable (Typeable)
+
 
 -- | names of top level declarations/definitions
 -- must be unique
@@ -21,6 +29,7 @@ data ConstructorNames = ConstructorNames
   { tconNames :: Set.Set TyConName,
     dconNames :: Set.Set DataConName
   }
+  deriving (Show, Generic, Typeable, Eq)
 
 type Typ = Term
 
@@ -106,7 +115,8 @@ type ModuleName = String
 -- | References to other modules (brings their declarations and
 -- definitions into the global scope)
 newtype ModuleImport = ModuleImport ModuleName
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, Typeable)
+  deriving anyclass (Unbound.Alpha)
 
 -- | A Module has a name, a list of imports, a list of declarations,
 --   and a set of constructor names (which affect parsing).
@@ -158,3 +168,47 @@ initialConstructorNames =
     { tconNames = Set.fromList ["Unit", "Bool", "Either", "Sigma"],
       dconNames = Set.fromList ["()", "True", "False", "Left", "Right", "Prod"]
     }
+
+-------------------------------------------------------
+-- Prelude datatypes
+-------------------------------------------------------
+
+-- * Source Positions
+
+-- SourcePositions do not have an instance of the Generic class available
+-- so we cannot automatically define their `Alpha` and `Subst` instances.
+-- Instead we provide a trivial implementation here.
+instance Unbound.Alpha SourcePos where
+  aeq' _ _ _ = True
+  fvAny' _ _ = pure
+  open _ _ = id
+  close _ _ = id
+  isPat _ = mempty
+  isTerm _ = mempty
+  nthPatFind _ = mempty
+  namePatFind _ = mempty
+  swaps' _ _ = id
+  freshen' _ x = return (x, mempty)
+  lfreshen' _ x cont = cont x mempty
+  acompare' _ _ _ = EQ
+
+
+-- * Constructor Names
+
+-- ConstructorNames are sets, so they also do not have an instance of the
+-- Generic class available so we cannot automatically define their
+-- Alpha and Subst instances.
+instance Unbound.Alpha ConstructorNames where
+  aeq' _ a1 a2 = a1 == a2
+  fvAny' _ _ = pure
+  open _ _ = id
+  close _ _ = id
+  isPat _ = mempty
+  isTerm _ = mempty
+  nthPatFind _ = mempty
+  namePatFind _ = mempty
+  swaps' _ _ = id
+  freshen' _ x = return (x, mempty)
+  lfreshen' _ x cont = cont x mempty
+  acompare' _ _ _ = EQ
+

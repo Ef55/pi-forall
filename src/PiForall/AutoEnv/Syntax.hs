@@ -207,8 +207,8 @@ instance Named LocalName (Pattern p) where
   names (PatCon _ p) = names p
 
 instance WithData (Pattern p) LocalName Const k where
-  getData (PatCon _ ps) = getData ps
-  getData (PatVar x) = DS.singleton (x, Const)
+  getData (PatCon _ ps) = error ""-- getData ps
+  getData (PatVar x) = DS.singleton x Const
 
 -- scoped patterns
 
@@ -227,7 +227,7 @@ instance Named LocalName (Local p n) where
   names (LocalDef _ _) = VNil
 
 instance WithData (Local p k) LocalName Typ k where
-  getData (LocalDecl n t) = DS.singleton (n, t)
+  getData (LocalDecl n t) = DS.singleton n t
   getData (LocalDef _ _) = DS.empty
 
 ----------------------------------------------
