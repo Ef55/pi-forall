@@ -125,9 +125,9 @@ putTypeError typeError = do
   print typeError
 
 -- | Type check the given file
-goFilename :: String -> IO ()
-goFilename pathToMainFile = do
-  let prefixes = [currentDir, mainFilePrefix]
+goFilename :: [String] -> String -> IO ()
+goFilename extras pathToMainFile = do
+  let prefixes = [currentDir, mainFilePrefix] ++ extras
       (mainFilePrefix, name) = splitFileName pathToMainFile
       currentDir = ""
   putStrLn $ "processing " ++ name ++ "..."
@@ -145,5 +145,5 @@ goFilename pathToMainFile = do
 main :: IO ()
 main = do
   [pathToMainFile] <- getArgs
-  goFilename pathToMainFile
+  goFilename [] pathToMainFile
   exitSuccess

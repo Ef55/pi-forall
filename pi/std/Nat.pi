@@ -57,9 +57,24 @@ minus = \n m .
                     Zero -> n
                     Succ mpred -> minus pred mpred
 
+nat_leq : Nat -> Nat -> Bool
+nat_leq = \ n m .
+  case n of
+    Zero -> True
+    Succ n' -> case m of
+      Zero -> False
+      Succ m' -> nat_leq n' m'
+
 -------------------------------------------------------
 -- Reasoning about datatypes
 
+lemma_plus_n_zero : (n: Nat) -> (plus n 0 = n)
+lemma_plus_n_zero = \ n .
+  case n of
+    Zero -> Refl
+    Succ p ->
+      let IH = (lemma_plus_n_zero p: plus p 0 = p) in
+      m_eq_n_Sm_eq_Sn (plus p 0) (p) IH
 
 minus_same_zero : (n : Nat) -> (minus n n = 0)
 minus_same_zero = \ n .
@@ -88,4 +103,3 @@ plus_associates = \ i j k .
     Succ i' ->
       let ih = (plus_associates i' j k) in
 		  m_eq_n_Sm_eq_Sn (plus (plus i' j) k) (plus i' (plus j k)) ih
-

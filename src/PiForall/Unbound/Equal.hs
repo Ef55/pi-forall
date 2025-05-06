@@ -99,7 +99,12 @@ equate t1 t2 = do
             case mpb of
               Just (p1, a1, p2, a2) | p1 == p2 -> do
                 equate a1 a2
-              _ -> Env.err [DS "Cannot match branches in",
+              _ -> do
+                (p1, _) <- Unbound.unbind bnd1
+                Env.warn [DN p1]
+                (p2, _) <- Unbound.unbind bnd2
+                Env.warn [DN p2]
+                Env.err [DS "Cannot match branches in",
                               DN n1, DS "and", DN n2]
       zipWithM_ matchBr brs1 brs2
 

@@ -27,13 +27,34 @@ std :: TestTree
 std =
   testGroup
     "Standard Library"
-    (positiveTests "pi/std" ["Equality", "List", "Option", "Vec", "Logic"])
+    ( positiveTests
+        "pi/std"
+        [ "Equality",
+          "List",
+          "Option",
+          "Vec",
+          "HList",
+          "Logic"
+        ]
+    )
 
 examples :: TestTree
 examples =
   testGroup
     "Examples"
-    (positiveTests "pi/examples" ["Lennart", "Hurkens", "Lambda", "Lambda0", "Lambda1", "Lambda2"])
+    ( positiveTests
+        "pi/examples"
+        [ "Lennart",
+          "Hurkens",
+          "Lambda",
+          "Lambda0",
+          "Lambda1",
+          "Lambda2",
+          "Compiler",
+          "Regex",
+          "AVL"
+        ]
+    )
 
 baseTests :: TestTree
 baseTests = testGroup "Base tests" (negativeTests "test/base" ["Fail", "ConstructorEvidence"])

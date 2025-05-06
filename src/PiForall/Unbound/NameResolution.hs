@@ -31,7 +31,7 @@ instance NameResolution LocalName S.TName where
 
 instance NameResolution C.Pattern S.Pattern where
   resolve p = case p of
-    C.PatCon n ps -> S.PatCon n <$> mapM (\p -> (, S.Rel) <$> resolve p) ps
+    C.PatCon n ps -> S.PatCon n <$> mapM (fmap (, S.Rel) . resolve) ps
     C.PatVar x -> S.PatVar <$> resolve x
 
   unresolve p = case p of
