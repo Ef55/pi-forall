@@ -1,28 +1,30 @@
 {- pi-forall language -}
 
 -- | Tools for working with multiple source files
-module PiForall.Unbound.Modules(getModules, ModuleInfo(..)) where
+module PiForall.Unbound.Modules (goFilename, getModules, ModuleInfo (..)) where
 
 import Control.Monad
-import PiForall.Unbound.Syntax
-
-import Text.ParserCombinators.Parsec.Error ( ParseError )
-import PiForall.Parser(parseModuleFile, parseModuleImports)
 import Control.Monad.Except
 import Control.Monad.State.Lazy
-import System.FilePath
-import System.Directory
-import qualified Data.Graph as Gr
-import Data.List(nub,(\\))
+import Data.Graph qualified as Gr
+import Data.List (nub, (\\))
+import PiForall.Unbound.Environment
+import PiForall.Unbound.Syntax
+import PiForall.Unbound.TypeCheck
 import PiForall.ConcreteSyntax qualified as C
+import PiForall.Parser
+import PiForall.PrettyPrint
+import System.Directory
+import System.Environment (getArgs)
+import System.Exit (exitFailure, exitSuccess)
+import System.FilePath
+import Text.ParserCombinators.Parsec.Error (ParseError, errorPos)
 import PiForall.Unbound.NameResolution qualified as NameResolution
-
 
 -- | getModules starts with a top-level module, and gathers all of the module's
 -- transitive dependency. It returns the list of parsed modules, with all
 -- modules appearing after its dependencies.
-getModules
-  :: (Functor m, MonadError ParseError m, MonadIO m) =>
+getModules :: (Functor m, MonadError ParseError m, MonadIO m) =>
      [FilePath] -> String -> m [Module]
 getModules prefixes top = do
   toParse <- gatherModules prefixes [ModuleImport top]
@@ -37,8 +39,7 @@ data ModuleInfo = ModuleInfo {
 
 -- | Build the module dependency graph.
 --   This only parses the imports part of each file; later we go back and parse all of it.
-gatherModules
-  :: (Functor m, MonadError ParseError m, MonadIO m) =>
+gatherModules :: (Functor m, MonadError ParseError m, MonadIO m) =>
      [FilePath] -> [ModuleImport] -> m [ModuleInfo]
 gatherModules prefixes ms = gatherModules' ms [] where
   gatherModules' [] accum = return $ topSort accum
@@ -84,5 +85,65 @@ reparse (ModuleInfo _ fileName _) = do
   put (C.moduleConstructors modu)
   case NameResolution.resolve modu of
     Just m -> return m
-    Nothing -> error "scope checking failed"
+    Nothing -> error "name resolution failed"
 
+exitWith :: Either a b -> (a -> IO ()) -> IO b
+exitWith res f =
+  case res of
+    Left x -> f x >> exitFailure
+    Right y -> return y
+
+-- | Type check the given string in the empty environment
+go :: String -> IO ()
+go str = do
+  case parseExpr str of
+    Left parseError -> putParseError parseError
+    Right term ->
+      case NameResolution.resolve term of
+        Nothing -> error "name resolution failed"
+        Just m -> do
+          putStrLn "parsed as"
+          exitSuccess
+          putStrLn $ pp $ NameResolution.nominalize m
+          res <- runTcMonad emptyEnv (inferType m)
+          case res of
+            Left typeError -> putTypeError (dispErr typeError)
+            Right ty -> do
+              putStrLn "typed with type"
+              putStrLn $ pp $ NameResolution.nominalize  ty
+
+-- | Display a parse error to the user
+putParseError :: ParseError -> IO ()
+putParseError parseError = do
+  putStrLn $ pp $ errorPos parseError
+  print parseError
+
+-- | Display a type error to the user
+putTypeError :: Doc () -> IO ()
+putTypeError typeError = do
+  putStrLn "Type Error:"
+  print typeError
+
+-- | Type check the given file
+goFilename :: String -> IO ()
+goFilename pathToMainFile = do
+  let prefixes = [currentDir, mainFilePrefix]
+      (mainFilePrefix, name) = splitFileName pathToMainFile
+      currentDir = ""
+  putStrLn $ "processing " ++ name ++ "..."
+  v <- runExceptT (getModules prefixes name)
+  val <- v `exitWith` putParseError
+  putStrLn "type checking..."
+  d <- runTcMonad emptyEnv (tcModules val)
+  defs <- d `exitWith` (putTypeError . dispErr)
+  putStrLn $ pp $ NameResolution.nominalize  (last defs)
+
+
+-- | 'pi <filename>' invokes the type checker on the given
+-- file and either prints the types of all definitions in the module
+-- or prints an error message.
+main :: IO ()
+main = do
+  [pathToMainFile] <- getArgs
+  goFilename pathToMainFile
+  exitSuccess
