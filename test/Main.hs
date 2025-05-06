@@ -5,29 +5,35 @@ module Main where
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe (isJust)
+import ParseScopeRT
 import PiForall.AutoEnv.Environment
 import PiForall.AutoEnv.Environment qualified as Env
 import PiForall.AutoEnv.Equal qualified as Equal
-import PiForall.Log qualified as Log
 import PiForall.AutoEnv.Modules
-import PiForall.PrettyPrint as PP
 import PiForall.AutoEnv.Syntax
+import PiForall.AutoEnv.TypeCheck
+import PiForall.Log qualified as Log
+import PiForall.PrettyPrint as PP
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck qualified as QC
 import Text.ParserCombinators.Parsec.Error
-import PiForall.AutoEnv.TypeCheck
-import ParseScopeRT
 
 --------------------------------------------------------------------------------
 -- Definition of tests to run
 --------------------------------------------------------------------------------
 
+std :: TestTree
+std =
+  testGroup
+    "Standard Library"
+    (positiveTests "pi/std" ["Equality", "List", "Option", "Vec", "Logic"])
+
 examples :: TestTree
 examples =
   testGroup
     "Examples"
-    (positiveTests "pi" ["Equality", "Lennart", "List", "Vec"])
+    (positiveTests "pi/examples" ["Lennart", "Hurkens", "Lambda", "Lambda0", "Lambda1", "Lambda2"])
 
 baseTests :: TestTree
 baseTests = testGroup "Base tests" (negativeTests "test/base" ["Fail", "ConstructorEvidence"])
@@ -50,6 +56,7 @@ main = do
     testGroup
       "All"
       [ QC.testProperty "PP-Parsing round trip" prop_roundtrip,
+        std,
         examples,
         baseTests,
         bugs
@@ -60,7 +67,7 @@ main = do
 --------------------------------------------------------------------------------
 
 standardLibrary :: [String]
-standardLibrary = ["pi"]
+standardLibrary = ["pi/std"]
 
 positiveTests :: String -> [String] -> [TestTree]
 positiveTests path tests = tcFile [path] True <$> tests

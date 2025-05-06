@@ -1,11 +1,15 @@
 import Criterion.Main
 
-import Modules qualified as PiForall
+import PiForall.Unbound.Modules qualified as UnPiForall
+import PiForall.AutoEnv.Modules qualified as AutoPiForall
+
+-- TODO: suppress IO
 
 main =
   defaultMain
     [ bgroup
         "Lennart"
-        [ bench "Lennart" $ nfIO (PiForall.goFilename "pi/Lennart.pi")
+        [  bench "Unbound" $ nfIO (UnPiForall.goFilename "pi/examples/Lennart.pi"),
+           bench "AutoEnv" $ nfIO (AutoPiForall.goFilename "pi/examples/Lennart.pi")
         ]
     ]

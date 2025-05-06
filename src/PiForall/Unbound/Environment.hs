@@ -29,7 +29,8 @@ module PiForall.Unbound.Environment
     D (..),
     Err (..),
     withStage,
-    checkStage
+    checkStage,
+    dispErr
   )
 where
 
@@ -53,8 +54,9 @@ import Control.Monad.Reader
   )
 import PiForall.PrettyPrint
 import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
-import PiForall.Unbound.NameResolution (NameResolution(..))
+import PiForall.Unbound.NameResolution (NameResolution(..), nominalize)
 import PiForall.ConcreteSyntax qualified as C
+
 
 
 -- | The type checking Monad includes a reader (for the
@@ -304,7 +306,10 @@ data D =
   | forall a' a. (NameResolution a' a, Display a') => DN a
 
 ddisp :: D -> (Doc ())
-ddisp = error ""
+ddisp (DS s) = pretty s
+ddisp (DD d) = d
+ddisp (DC a) = disp a
+ddisp (DN a) = disp $ nominalize a
 
 -- | Augment the error message with addition information
 extendErr :: MonadError Err m => m a -> [D] -> m a

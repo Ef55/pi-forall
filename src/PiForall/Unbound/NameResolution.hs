@@ -45,7 +45,7 @@ instance NameResolution C.Match S.Match where
     C.Branch <$> unresolve pat <*> unresolve t
 
 instance NameResolution C.Term S.Term where
-  resolve t = case t of
+  resolve t_ = case t_ of
     C.TyType -> return S.TyType
     C.Lam  x t -> S.Lam S.Rel <$> bindResolve x t
     C.Var x -> S.Var <$> resolve x
@@ -56,7 +56,7 @@ instance NameResolution C.Term S.Term where
     C.TyCon n as -> S.TyCon n <$> mapM resolveArg as
     C.DataCon n as -> S.DataCon n <$> mapM resolveArg as
     C.Case s bs -> S.Case <$> resolve s <*> mapM resolve bs
-    C.App l r -> S.App <$> resolve t <*> resolveArg r
+    C.App l r -> S.App <$> resolve l <*> resolveArg r
     C.Ann t ty -> S.Ann <$> resolve t <*> resolve ty
     C.TyEq l r -> S.TyEq <$> resolve l <*> resolve r
     C.Subst l r -> S.Subst <$> resolve l <*> resolve r
@@ -95,7 +95,7 @@ instance NameResolution C.Term S.Term where
     S.TyCon n args -> C.TyCon n <$> mapM unresolveArg args
     S.DataCon n args -> C.DataCon n <$> mapM unresolveArg args
     S.Case s bs -> C.Case <$> unresolve s <*> mapM unresolve bs
-    _ -> error ""
+    _ -> error "WIP"
     where
       unresolveArg (S.Arg _ t) = unresolve t
 
@@ -113,7 +113,7 @@ instance NameResolution C.ConstructorDef S.ConstructorDef where
 instance NameResolution C.ModuleEntry S.ModuleEntry where
   resolve e = case e of
     C.ModuleDecl n t -> S.ModuleDecl <$> S.TypeDecl (Unbound.string2Name n) S.Rel <$> resolve t
-    C.ModuleDef n t -> S.ModuleDef (Unbound.string2Name n) <$> resolve t
+    C.ModuleDef n t -> S.ModuleDef (Unbound.string2Name n) <$> resolve (t :: C.Term)
     C.ModuleData n (C.DataDef params ty cstrs) -> do
       -- TODO: what about ty?
       params' <- resolve params
@@ -124,6 +124,7 @@ instance NameResolution C.ModuleEntry S.ModuleEntry where
     S.ModuleDecl (S.TypeDecl n _ t) -> C.ModuleDecl <$> unresolveG n <*> unresolve t
     S.ModuleDef n t -> C.ModuleDef <$> unresolveG n <*> unresolve t
     S.ModuleData n params cstrs -> C.ModuleData n <$> (C.DataDef <$> unresolve params <*> return C.TyType <*> mapM unresolve cstrs)
+    _ -> error "WIP"
 
 instance NameResolution C.Entry S.Entry where
   resolve e = case e of
@@ -132,11 +133,10 @@ instance NameResolution C.Entry S.Entry where
   unresolve e = case e of
     S.Decl (S.TypeDecl n _ t) -> C.EntryDecl <$> unresolve n <*> unresolve t
     S.Def n t -> C.EntryDef <$> unresolve n <*> unresolve t
-    _ -> error "WIP"
 
 instance NameResolution C.Module S.Module where
   resolve (C.Module name imports entries constructors) = do
-    entries' <- mapM resolve entries
+    entries' :: [S.ModuleEntry] <- mapM resolve entries
     return $ S.Module name imports entries' constructors
   unresolve (S.Module name imports entries constructors) = do
     entries' <- mapM unresolve entries
