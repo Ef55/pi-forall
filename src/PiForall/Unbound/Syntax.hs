@@ -332,7 +332,7 @@ subst = Unbound.subst
 
 -- | in a binder `x.a` replace `x` with `b`
 instantiate :: Unbound.Bind TName Term -> Term -> Term
-instantiate bnd a = Unbound.instantiate bnd [a]
+instantiate bnd a = Unbound.substBind bnd a
 
 -- | in a binder `x.a` replace `x` with a fresh name
 unbind :: (Unbound.Fresh m) => Unbound.Bind TName Term -> m (TName, Term)
