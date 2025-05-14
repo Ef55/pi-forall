@@ -37,12 +37,12 @@ import Control.Monad.Reader
     asks,
   )
 import Control.Monad.Writer (MonadWriter (..), Writer, runWriter)
-import Data.FinAux qualified as Fin
+import Data.Fin qualified as Fin
+import Data.SNat qualified as Nat
 import Data.Foldable (Foldable (..), toList)
 import Data.List
 import Data.List qualified as List
 import Data.Maybe (listToMaybe)
-import Data.Type.Nat qualified as Nat
 import Data.Vec qualified as Vec
 import PiForall.Log
 import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck

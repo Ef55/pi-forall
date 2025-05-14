@@ -22,7 +22,7 @@ import AutoEnv.Bind.Single qualified as B
 import AutoEnv.DependentScope (WithData (..))
 import AutoEnv.DependentScope qualified as DS
 import AutoEnv.MonadScoped
-import Data.FinAux
+import Data.Fin
 import Data.Maybe qualified as Maybe
 import Data.Scoped.Const
 import Data.Set qualified as Set

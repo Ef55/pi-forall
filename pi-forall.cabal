@@ -35,8 +35,6 @@ common common-stanza
     , mtl
     , brick
     , vty
-    , fin
-    , vec
     , unbound-generics
   default-language:
     GHC2021

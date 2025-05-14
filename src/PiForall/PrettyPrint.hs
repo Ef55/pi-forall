@@ -12,7 +12,7 @@ where
 
 import PiForall.ConcreteSyntax
 import Control.Monad.Reader (MonadReader (ask, local), asks)
-import Data.FinAux qualified as Fin
+import Data.Fin qualified as Fin
 import Data.Foldable qualified as Foldable
 import Data.List as List
 import Data.LocalName (LocalName)

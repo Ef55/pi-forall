@@ -6,27 +6,27 @@ import PiForall.Unbound.Modules qualified as UnPiForall
 
 prefixes = ["pi/std"]
 
-b name path =
+onImplementation :: String -> ([String] -> String -> IO ()) -> Benchmark
+onImplementation group run =
   bgroup
-    name
-    [ bench "Unbound" $ nfIO (UnPiForall.goFilename prefixes path),
-      bench "AutoEnv" $ nfIO (AutoPiForall.goFilename prefixes path)
+    group
+    [ bgroup
+        "Compute"
+        [ b "Lennart" "pi/examples/cLennart.pi",
+          b "Compiler" "pi/examples/cCompiler.pi"
+        ],
+      bgroup
+        "Typechecking"
+        [ b "Compiler" "pi/examples/Compiler.pi",
+        -- TODO: fix bug in unbound version
+          b "AVL" "pi/examples/AVL.pi"
+        ]
     ]
+  where
+    b name path = bench name $ nfIO (run prefixes path)
 
 main =
   defaultMain
-    [ bgroup
-        "/"
-        [ bgroup
-            "Compute"
-            [ b "Lennart" "pi/examples/cLennart.pi",
-              b "Compiler" "pi/examples/cCompiler.pi"
-            ],
-          bgroup
-            "Typechecking"
-            [ b "Compiler" "pi/examples/Compiler.pi"
-            -- TODO: fix bug in unbound version
-              --b "AVL" "pi/examples/AVL.pi"
-            ]
-        ]
+    [ onImplementation "Unbound" UnPiForall.goFilename,
+      onImplementation "Autoenv" AutoPiForall.goFilename
     ]

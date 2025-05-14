@@ -16,7 +16,7 @@ import AutoEnv.Lib
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Writer (tell)
-import Data.FinAux qualified as Fin
+import Data.Fin qualified as Fin
 import Data.Foldable
 import Data.List (nub)
 import Data.List qualified as List
