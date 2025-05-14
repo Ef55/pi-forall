@@ -52,28 +52,31 @@ data Some2 (p :: Nat -> Nat -> Type) n where
   Some2 :: forall x n p. (SNatI x) => (p x n) -> Some2 p n
 
 scopeTelescope :: forall n. C.Telescope -> Scope n (Some2 S.Telescope n)
-scopeTelescope [] = pure $ Some2 Scoped.TNil
-scopeTelescope (C.EntryDecl n ty : entries) = do
-  ty' <- scope' ty
-  Scoped.push n $ do
-    Some2 @p1 tele' <- scopeTelescope entries
-    let ret = S.LocalDecl n ty' <:> tele'
-    withSNat (sPlus (snat @p1) (snat @(S Z))) $
-      return $
-        Some2 ret
-scopeTelescope (C.EntryDef n tm : entries) = do
-  tm' <- scope' tm
-  Some2 (tele' :: S.Telescope p n) <- scopeTelescope entries
-  case axiomPlusZ @p of
-    Refl -> do
-      ln <- Maybe.fromJust <$> lookup n
-      let ret = S.LocalDef ln tm' <:> tele'
-      return $ Some2 ret
+scopeTelescope (C.Telescope t) = iter t
+  where
+    iter :: forall n. [C.Entry] -> Scope n (Some2 S.Telescope n)
+    iter [] = pure $ Some2 Scoped.TNil
+    iter (C.EntryDecl n ty : entries) = do
+      ty' <- scope' ty
+      Scoped.push n $ do
+        Some2 @p1 tele' <- iter entries
+        let ret = S.LocalDecl n ty' <:> tele'
+        withSNat (sPlus (snat @p1) (snat @(S Z))) $
+          return $
+            Some2 ret
+    iter (C.EntryDef n tm : entries) = do
+      tm' <- scope' tm
+      Some2 (tele' :: S.Telescope p n) <- iter entries
+      case axiomPlusZ @p of
+        Refl -> do
+          ln <- Maybe.fromJust <$> lookup n
+          let ret = S.LocalDef ln tm' <:> tele'
+          return $ Some2 ret
 
-unscopeTelescope :: S.Telescope p n -> Unscope n [C.Entry]
-unscopeTelescope Scoped.TNil = return []
+unscopeTelescope :: S.Telescope p n -> Unscope n C.Telescope
+unscopeTelescope Scoped.TNil = return $ C.Telescope []
 unscopeTelescope (Scoped.TCons h t) =
-  (:) <$> unscopeLocal h <*> Scoped.push h (unscopeTelescope t)
+  (C.<:>) <$> Scoped.push h (unscopeTelescope t) <*> unscopeLocal h
   where
     unscopeLocal :: S.Local p n -> Unscope n C.Entry
     unscopeLocal (S.LocalDecl n t) = C.EntryDecl n <$> unscope' t

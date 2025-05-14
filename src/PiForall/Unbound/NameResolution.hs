@@ -11,7 +11,7 @@ import Data.Maybe qualified as Maybe
 import Text.ParserCombinators.Parsec.Pos ( initialPos)
 import Control.Monad.Identity (Identity, runIdentity)
 
-class NameResolution u r | r -> u where
+class NameResolution u r | u -> r, r -> u where
   resolve :: u -> Maybe r
   unresolve :: r -> FreshMT Identity u
 
@@ -101,8 +101,8 @@ instance NameResolution C.Term S.Term where
 
 
 instance NameResolution C.Telescope S.Telescope where
-  resolve es = S.Telescope <$> mapM resolve es
-  unresolve (S.Telescope es) = mapM unresolve es
+  resolve (C.Telescope es) = S.Telescope <$> mapM resolve es
+  unresolve (S.Telescope es) = C.Telescope <$> mapM unresolve es
 
 instance NameResolution C.ConstructorDef S.ConstructorDef where
   resolve (C.ConstructorDef pos n tele) = do
@@ -142,7 +142,11 @@ instance NameResolution C.Module S.Module where
     entries' <- mapM unresolve entries
     return $ C.Module name imports entries' constructors
 
-instance NameResolution c s => NameResolution [c] [s] where
+instance NameResolution [C.ModuleEntry] [S.ModuleEntry] where
+  resolve = mapM resolve
+  unresolve = mapM unresolve
+
+instance NameResolution [C.Entry] [S.Entry] where
   resolve = mapM resolve
   unresolve = mapM unresolve
 

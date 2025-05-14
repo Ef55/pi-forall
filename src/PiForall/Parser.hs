@@ -309,7 +309,7 @@ importDef = do reserved "import" >> (ModuleImport <$> importName)
 
 telescope :: LParser Telescope
 telescope = do
-  foldr id [] <$> telebindings
+  Telescope <$> (foldr id [] <$> telebindings)
 
 telebindings :: LParser [[Entry] -> [Entry]]
 telebindings = many teleBinding
@@ -378,7 +378,7 @@ constructorDef =
   do
     pos <- getPosition
     cname <- identifier
-    args <- option [] (reserved "of" >> telescope)
+    args <- option (Telescope []) (reserved "of" >> telescope)
     return $ ConstructorDef (Just pos) cname args
     <?> "Constructor"
 
