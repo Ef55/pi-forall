@@ -35,7 +35,6 @@ import Data.Fin qualified as Fin
 import Data.Fin qualified as Nat
 import Data.Maybe (fromJust)
 import Data.Maybe qualified as Maybe
-import Data.Type.Nat qualified as Nat
 import Data.Vec qualified as Vec
 import PiForall.AutoEnv.Syntax qualified as S
 import PiForall.ConcreteSyntax qualified as C

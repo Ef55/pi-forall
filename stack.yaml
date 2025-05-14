@@ -4,6 +4,6 @@ packages:
 - .
 extra-deps:
 - github: Ef55/autoenv
-  commit: 4b2cf2016f14d2052a0239f218cd70d56501f88e
+  commit: 4d39d0067db0231effbe71e8a76b5fcf5c733fba
 - unbound-generics-0.4.4@sha256:f7fc93641d5043db8938a5e77f463afa7c473edca3ef26097d4b6f98d45e255c,5521
 notify-if-nix-on-path: false
