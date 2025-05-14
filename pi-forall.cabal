@@ -87,6 +87,7 @@ test-suite test-pi-forall
   main-is: Main.hs
   other-modules:
     ParseScopeRT
+    ParseResolveRT
 
 benchmark bench-pi-forall
   import: common-stanza

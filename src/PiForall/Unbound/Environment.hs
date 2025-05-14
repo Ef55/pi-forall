@@ -148,7 +148,7 @@ lookupTy v =
         err
           [ DS ("The variable " ++ show v ++ " was not found."),
             DS "in context",
-            DN @[C.ModuleEntry] gamma
+            DN gamma
           ]
 
 -- | Find a name's def in the context.

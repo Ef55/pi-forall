@@ -5,7 +5,8 @@ module Main where
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe (isJust)
-import ParseScopeRT
+import ParseScopeRT as AutoRT
+import ParseResolveRT as UnRT
 import PiForall.AutoEnv.Environment
 import PiForall.AutoEnv.Environment qualified as Env
 import PiForall.AutoEnv.Equal qualified as Equal
@@ -76,7 +77,8 @@ main = do
   defaultMain $
     testGroup
       "All"
-      [ QC.testProperty "PP-Parsing round trip" prop_roundtrip,
+      [ QC.testProperty "PP-Parsing-Scope round trip" AutoRT.prop_roundtrip,
+        QC.testProperty "PP-Parsing-Resolve round trip" UnRT.prop_roundtrip,
         std,
         examples,
         baseTests,

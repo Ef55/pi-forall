@@ -348,7 +348,7 @@ tcArgTele [] _ =
 tcArgTele _ [] =
   Env.err [DS "Too many arguments provided."]
 tcArgTele _  tele =
-  Env.err [DS "Invalid telescope", DN tele]
+  Env.err [DS "Invalid telescope", DN (Telescope tele)]
 
 -- | Substitute a list of terms for the variables bound in a telescope
 -- This is used to instantiate the parameters of a data constructor
@@ -380,7 +380,7 @@ doSubst ss (Decl decl : tele') = do
   tele'' <- doSubst ss tele'
   return $ Decl decl' : tele''
 doSubst _ tele =
-  Env.err [DS "Invalid telescope", DN tele]
+  Env.err [DS "Invalid telescope", DN $ Telescope tele]
 
 -----------------------------------------------------------
 

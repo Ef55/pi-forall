@@ -78,11 +78,11 @@ data Entry where
 -- That are used as typing contexts
 -- 'p' is the number of variables introduced by the telescope
 -- 'n' is the scope depth for A1 (and A2 has depth S n, etc.)
-type Telescope = [Entry]
+newtype Telescope = Telescope [Entry]
 
 -- | add a new local entry to a telescope
 (<:>) :: Telescope -> Entry -> Telescope
-t <:> e = t ++ [e]
+Telescope t <:> e = Telescope $ t ++ [e]
 
 -- | Toplevel components of modules
 data ModuleEntry

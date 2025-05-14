@@ -148,7 +148,7 @@ instance Display DataDef where
         )
 
 instance Display ConstructorDef where
-  display (ConstructorDef _ c []) = do
+  display (ConstructorDef _ c (Telescope [])) = do
     pure $ PP.pretty c
   display (ConstructorDef _ c tele) = do
     dc <- display c
@@ -156,22 +156,24 @@ instance Display ConstructorDef where
     pure $ dc <+> PP.pretty "of" <+> dt
 
 instance Display Telescope where
-  display [] = mempty
-  display ((EntryDecl x tm) : tele) = do
-    dtm <- display tm
-    dtele <- display tele
-    return $
-      PP.parens
-        ( if x /= LocalName.internalName
-            then PP.pretty (show x) <+> PP.colon <+> dtm
-            else dtm
-        )
-        <+> dtele
-  display ((EntryDef x tm) : tele) = do
-    dx <- display (Var x)
-    dtm <- display tm
-    dtele <- display tele
-    return $ PP.brackets (dx <+> PP.equals <+> dtm) <+> dtele
+  display (Telescope t) = iter t
+    where
+      iter [] = mempty
+      iter ((EntryDecl x tm) : tele) = do
+        dtm <- display tm
+        dtele <- iter tele
+        return $
+          PP.parens
+            ( if x /= LocalName.internalName
+                then PP.pretty (show x) <+> PP.colon <+> dtm
+                else dtm
+            )
+            <+> dtele
+      iter ((EntryDef x tm) : tele) = do
+        dx <- display (Var x)
+        dtm <- display tm
+        dtele <- iter tele
+        return $ PP.brackets (dx <+> PP.equals <+> dtm) <+> dtele
 
 -------------------------------------------------------------------------
 -- Disp Instances for Prelude types
