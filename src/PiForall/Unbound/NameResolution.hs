@@ -2,22 +2,20 @@
 
 module PiForall.Unbound.NameResolution where
 
-import AutoEnv (LocalName(..))
-import PiForall.Unbound.Syntax qualified as S
-import PiForall.ConcreteSyntax qualified as C
-import qualified Unbound.Generics.LocallyNameless as Unbound
-import Unbound.Generics.LocallyNameless
-import Data.Maybe qualified as Maybe
-import Text.ParserCombinators.Parsec.Pos ( initialPos)
+import AutoEnv (LocalName (..), internalName)
 import Control.Monad.Identity (Identity, runIdentity)
+import Control.Monad.State (State, StateT (..), evalStateT, runStateT, gets, modify)
+import Data.Map qualified as Map
+import Data.Maybe qualified as Maybe
+import PiForall.ConcreteSyntax qualified as C
+import PiForall.Unbound.Syntax qualified as S
+import Text.ParserCombinators.Parsec.Pos (initialPos)
+import Unbound.Generics.LocallyNameless
+import Unbound.Generics.LocallyNameless qualified as Unbound
 
 class NameResolution u r | u -> r, r -> u where
   resolve :: u -> Maybe r
   unresolve :: r -> FreshMT Identity u
-
--- instance NameResolution C.GlobalName S.TName where
---   resolve = return . Unbound.string2Name
---   unresolve = return . show
 
 resolveG :: String -> Maybe S.TName
 resolveG = return . Unbound.string2Name
@@ -27,12 +25,23 @@ unresolveG = return . show
 
 instance NameResolution LocalName S.TName where
   resolve (LocalName x) = return $ Unbound.string2Name x
-  unresolve = return . LocalName . show
+  unresolve = return . LocalName . Unbound.name2String
 
 instance NameResolution C.Pattern S.Pattern where
-  resolve p = case p of
-    C.PatCon n ps -> S.PatCon n <$> mapM (fmap (, S.Rel) . resolve) ps
-    C.PatVar x -> S.PatVar <$> resolve x
+  resolve p = evalStateT (iter p) Map.empty
+    where
+      -- Unbound (`unbind2` to be precise) doe not work that well with patterns
+      -- which bind the same name twice, so we solve this here by "wildcarding"
+      -- the first occurrences of names which appear multiple times in a
+      -- pattern. Note that the wildcards themselves must be unique.
+      iter :: C.Pattern -> StateT (Map.Map String Int) Maybe S.Pattern
+      iter (C.PatCon n ps) = S.PatCon n . reverse <$> mapM (fmap (,S.Rel) . iter) (reverse ps)
+      iter (C.PatVar (LocalName x)) = do
+        i <- gets (Map.findWithDefault 0 x)
+        let x' = if i == 0 then x else "_$" ++ show i
+        x'' <- StateT $ \s -> (,s) <$> resolve (LocalName x')
+        modify (Map.insert x (i + 1))
+        return $ S.PatVar x''
 
   unresolve p = case p of
     S.PatCon n ps -> C.PatCon n <$> mapM (\(p, _) -> unresolve p) ps
@@ -47,7 +56,7 @@ instance NameResolution C.Match S.Match where
 instance NameResolution C.Term S.Term where
   resolve t_ = case t_ of
     C.TyType -> return S.TyType
-    C.Lam  x t -> S.Lam S.Rel <$> bindResolve x t
+    C.Lam x t -> S.Lam S.Rel <$> bindResolve x t
     C.Var x -> S.Var <$> resolve x
     C.Global n -> return $ S.Var $ Unbound.string2Name n
     C.Pi l x r -> S.TyPi S.Rel <$> resolve l <*> bindResolve x r
@@ -99,7 +108,6 @@ instance NameResolution C.Term S.Term where
     where
       unresolveArg (S.Arg _ t) = unresolve t
 
-
 instance NameResolution C.Telescope S.Telescope where
   resolve (C.Telescope es) = S.Telescope <$> mapM resolve es
   unresolve (S.Telescope es) = C.Telescope <$> mapM unresolve es
@@ -150,7 +158,8 @@ instance NameResolution [C.Entry] [S.Entry] where
   resolve = mapM resolve
   unresolve = mapM unresolve
 
-resolveNames :: NameResolution c s => c -> Maybe s
+resolveNames :: (NameResolution c s) => c -> Maybe s
 resolveNames = resolve
-nominalize :: NameResolution c s => s -> c
+
+nominalize :: (NameResolution c s) => s -> c
 nominalize = runIdentity . runFreshMT . unresolve
