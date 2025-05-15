@@ -5,14 +5,18 @@ module Main where
 import Control.Monad.Except
 import Data.List (intercalate)
 import Data.Maybe (isJust)
-import ParseScopeRT as AutoRT
 import ParseResolveRT as UnRT
-import PiForall.AutoEnv.Environment
-import PiForall.AutoEnv.Environment qualified as Env
-import PiForall.AutoEnv.Equal qualified as Equal
-import PiForall.AutoEnv.Modules
-import PiForall.AutoEnv.Syntax
-import PiForall.AutoEnv.TypeCheck
+import ParseScopeRT as AutoPiForall
+import PiForall.AutoEnv.Environment qualified as AutoPiForall
+import PiForall.AutoEnv.Equal qualified as AutoPiForall
+import PiForall.AutoEnv.Modules qualified as AutoPiForall
+import PiForall.AutoEnv.Syntax qualified as AutoPiForall
+import PiForall.AutoEnv.TypeCheck qualified as AutoPiForall
+import PiForall.Unbound.Environment qualified as UnPiForall
+import PiForall.Unbound.Equal qualified as UnPiForall
+import PiForall.Unbound.Modules qualified as UnPiForall
+import PiForall.Unbound.Syntax qualified as UnPiForall
+import PiForall.Unbound.TypeCheck qualified as UnPiForall
 import PiForall.Log qualified as Log
 import PiForall.PrettyPrint as PP
 import Test.Tasty
@@ -24,11 +28,18 @@ import Text.ParserCombinators.Parsec.Error
 -- Definition of tests to run
 --------------------------------------------------------------------------------
 
-std :: TestTree
-std =
+positiveTests :: ([String] -> Bool -> String -> TestTree) -> String -> [String] -> [TestTree]
+positiveTests tcFile path tests = tcFile [path] True <$> tests
+
+negativeTests :: ([String] -> Bool -> String -> TestTree) -> String -> [String] -> [TestTree]
+negativeTests tcFile path tests = tcFile [path] False <$> tests
+
+std :: ([String] -> Bool -> String -> TestTree) -> TestTree
+std tcFile =
   testGroup
     "Standard Library"
     ( positiveTests
+        tcFile
         "pi/std"
         [ "Equality",
           "List",
@@ -39,11 +50,12 @@ std =
         ]
     )
 
-examples :: TestTree
-examples =
+examples :: ([String] -> Bool -> String -> TestTree) -> TestTree
+examples tcFile =
   testGroup
     "Examples"
     ( positiveTests
+        tcFile
         "pi/examples"
         [ "Lennart",
           "Hurkens",
@@ -57,11 +69,11 @@ examples =
         ]
     )
 
-baseTests :: TestTree
-baseTests = testGroup "Base tests" (negativeTests "test/base" ["Fail", "ConstructorEvidence"])
+baseTests :: ([String] -> Bool -> String -> TestTree) -> TestTree
+baseTests tcFile = testGroup "Base tests" (negativeTests tcFile "test/base" ["Fail", "ConstructorEvidence"])
 
-bugs :: TestTree
-bugs =
+bugs :: ([String] -> Bool -> String -> TestTree) -> TestTree
+bugs tcFile =
   testGroup
     "Bugs"
     ( positiveTests
@@ -71,18 +83,27 @@ bugs =
           "Bug2"
         ]
     )
+  where
+    positiveTests :: String -> [String] -> [TestTree]
+    positiveTests path tests = tcFile [path] True <$> tests
 
 main :: IO ()
 main = do
   defaultMain $
     testGroup
-      "All"
-      [ QC.testProperty "PP-Parsing-Scope round trip" AutoRT.prop_roundtrip,
-        QC.testProperty "PP-Parsing-Resolve round trip" UnRT.prop_roundtrip,
-        std,
-        examples,
-        baseTests,
-        bugs
+      "/"
+      [ testGroup
+          "Unbound"
+          [ QC.testProperty "PP-Parsing round trip" UnRT.prop_roundtrip
+          ],
+        testGroup
+          "Autoenv"
+          [ QC.testProperty "PP-Parsing round trip" AutoPiForall.prop_roundtrip,
+            std autoTcFile,
+            examples autoTcFile,
+            baseTests autoTcFile,
+            bugs autoTcFile
+          ]
       ]
 
 --------------------------------------------------------------------------------
@@ -92,34 +113,29 @@ main = do
 standardLibrary :: [String]
 standardLibrary = ["pi/std"]
 
-positiveTests :: String -> [String] -> [TestTree]
-positiveTests path tests = tcFile [path] True <$> tests
-
-negativeTests :: String -> [String] -> [TestTree]
-negativeTests path tests = tcFile [path] False <$> tests
-
 --------------------------------------------------------------------------------
 -- Testing functions
 --------------------------------------------------------------------------------
+autoTcFile :: [String] -> Bool -> String -> TestTree
+autoTcFile path positive name =
+  testCase (name ++ if positive then " [✔]" else " [✘]") $ do
+    v <- runExceptT (AutoPiForall.getModules (path ++ standardLibrary) name)
+    case v of
+      Left err -> assertFailure $ "Parsing error:" ++ show err
+      Right val -> case AutoPiForall.runTcMonad (AutoPiForall.tcModules val) of
+        (Left err, _) -> assertFailure $ "Type error:\n" ++ show (AutoPiForall.displayErr err PP.initDI)
+        (Right res, logs) -> case filter (not . Log.isInfo) logs of
+          logs@(_:_) -> assertFailure $ "Warnings were produced:" ++ intercalate "\n" (fmap show logs)
+          _ -> return ()
 
-data Result
-  = ParsingFailure ParseError
-  | TypingFailure Err
-  | TestSuccess [Module] [Log.Log]
-
-tester :: String -> [String] -> String -> (Result -> Assertion) -> TestTree
-tester testName path fileName k = testCase testName $ do
-  v <- runExceptT (getModules (path ++ standardLibrary) fileName)
-  case v of
-    Left b -> k $ ParsingFailure b
-    Right val -> case runTcMonad (tcModules val) of
-      (Left err, _) -> k $ TypingFailure err
-      (Right res, logs) -> k $ TestSuccess res (filter (not . Log.isInfo) logs)
-
--- | Type check the given file
-tcFile :: [String] -> Bool -> String -> TestTree
-tcFile path positive name = tester (name ++ if positive then " [✔]" else " [✘]") path name $ \case
-  ParsingFailure err -> assertFailure $ "Parsing error:" ++ show err
-  TypingFailure err -> assertFailure $ "Type error:\n" ++ show (displayErr err PP.initDI)
-  TestSuccess _ logs@(_ : _) -> assertFailure $ "Warnings were produced:" ++ intercalate "\n" (fmap show logs)
-  TestSuccess r [] -> return ()
+unTcFile :: [String] -> Bool -> String -> TestTree
+unTcFile path positive name =
+  testCase (name ++ if positive then " [✔]" else " [✘]") $ do
+    v <- runExceptT (UnPiForall.getModules (path ++ standardLibrary) name)
+    case v of
+      Left err -> assertFailure $ "Parsing error:" ++ show err
+      Right val -> case UnPiForall.runTcMonad UnPiForall.emptyEnv (UnPiForall.tcModules val) of
+        (Left err, _) -> assertFailure $ "Type error:\n" ++ show (UnPiForall.dispErr err PP.initDI)
+        (Right res, logs) -> case filter (not . Log.isInfo) logs of
+          logs@(_:_) -> assertFailure $ "Warnings were produced:" ++ intercalate "\n" (fmap show logs)
+          _ -> return ()
