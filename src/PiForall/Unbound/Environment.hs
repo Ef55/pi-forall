@@ -49,28 +49,32 @@ import Control.Monad.Reader
     ask,
     asks,
   )
+import Control.Monad.Writer (Writer, runWriter, MonadWriter (tell))
 import Data.List
 import Data.Maybe (listToMaybe)
 import PiForall.ConcreteSyntax qualified as C
+import PiForall.Log
 import PiForall.PrettyPrint
 import PiForall.Unbound.NameResolution (NameResolution (..), nominalize)
 import PiForall.Unbound.Syntax
 import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
 import Unbound.Generics.LocallyNameless qualified as Unbound
+import qualified Data.List as List
 
 -- | The type checking Monad includes a reader (for the
 -- environment), freshness state (for supporting locally-nameless
 -- representations), error (for error reporting), and IO
 -- (for e.g.  warning messages).
-type TcMonad = Unbound.FreshMT (ReaderT Env (ExceptT Err IO))
+type TcMonad = Unbound.FreshMT (ReaderT Env (ExceptT Err (Writer [Log])))
 
 -- | Entry point for the type checking monad, given an
 -- initial environment, returns either an error message
 -- or some result.
-runTcMonad :: Env -> TcMonad a -> IO (Either Err a)
+runTcMonad :: Env -> TcMonad a -> (Either Err a, [Log])
 runTcMonad env m =
-  runExceptT $
-    runReaderT (Unbound.runFreshMT m) env
+  runWriter $
+    runExceptT $
+      runReaderT (Unbound.runFreshMT m) env
 
 -- | Marked locations in the source code
 data SourceLocation where
@@ -248,7 +252,7 @@ extendCtxsGlobal ds =
     )
 
 -- | Extend the context with a telescope
-extendCtxTele :: (MonadReader Env m, MonadIO m, MonadError Err m) => [ModuleEntry] -> m a -> m a
+extendCtxTele :: (MonadReader Env m, MonadWriter [Log] m, MonadError Err m) => [ModuleEntry] -> m a -> m a
 extendCtxTele [] m = m
 extendCtxTele (ModuleDef x t2 : tele) m =
   extendCtx (ModuleDef x t2) $ extendCtxTele tele m
@@ -339,10 +343,11 @@ err d = do
   throwError $ Err loc (sep $ map ddisp d)
 
 -- | Print a warning
-warn :: (MonadReader Env m, MonadIO m) => [D] -> m ()
+warn :: (MonadReader Env m, MonadWriter [Log] m) => [D] -> m ()
 warn e = do
   loc <- getSourceLocation
-  liftIO $ putStrLn $ show $ vcat $ (ddisp <$> (DS "warning: " : e))
+  let msg = vcat $ ddisp <$> e
+  tell $ List.singleton $ Warn $ show msg
 
 checkStage ::
   (MonadReader Env m, MonadError Err m) =>

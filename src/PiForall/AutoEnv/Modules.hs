@@ -158,7 +158,7 @@ goFilename extras pathToMainFile = do
   val <- v `exitWith` putParseError
   putStrLn "type checking..."
   let (d, logs) = runTcMonad (tcModules val)
-  mapM_ (putStrLn . show) logs
+  mapM_ print logs
   defs <- d `exitWith` (putTypeError . flip displayErr initDI)
   putStrLn $ pp $ ScopeCheck.unscope (last defs)
 

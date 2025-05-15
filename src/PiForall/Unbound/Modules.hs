@@ -125,7 +125,8 @@ go str = do
           putStrLn "parsed as"
           exitSuccess
           putStrLn $ pp $ NameResolution.nominalize m
-          res <- runTcMonad emptyEnv (inferType m)
+          let (res, logs) = runTcMonad emptyEnv (inferType m)
+          mapM_ print logs
           case res of
             Left typeError -> putTypeError (dispErr typeError)
             Right ty -> do
@@ -154,7 +155,8 @@ goFilename extras pathToMainFile = do
   v <- runExceptT (getModules prefixes name)
   val <- v `exitWith` putParseError
   putStrLn "type checking..."
-  d <- runTcMonad emptyEnv (tcModules val)
+  let (d, logs) = runTcMonad emptyEnv (tcModules val)
+  mapM_ print logs
   defs <- d `exitWith` (putTypeError . dispErr)
   putStrLn $ pp $ NameResolution.nominalize (last defs)
 
