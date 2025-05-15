@@ -1,8 +1,8 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 -- | The abstract syntax of the simple dependently typed language
 -- See the comment at the top of 'Parser' for the concrete syntax of this language
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DeriveAnyClass #-}
 module PiForall.Unbound.Syntax
   ( module PiForall.Unbound.Syntax,
     GlobalName,
@@ -10,21 +10,21 @@ module PiForall.Unbound.Syntax
     TyConName (..),
     DataConName (..),
     ModuleImport (..),
-    ModuleName (..)
-  ) where
+    ModuleName (..),
+  )
+where
 
+import Data.Function (on)
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Typeable (Typeable)
-import GHC.Generics (Generic,from)
 import GHC.Base (MonadPlus)
+import GHC.Generics (Generic, from)
+import PiForall.ConcreteSyntax (ConstructorNames (..), DataConName, GlobalName, ModuleImport (..), ModuleName, TyConName)
 import Text.ParserCombinators.Parsec.Pos (SourcePos, initialPos, newPos)
 import Unbound.Generics.LocallyNameless qualified as Unbound
 import Unbound.Generics.LocallyNameless.Internal.Fold qualified as Unbound
-import PiForall.ConcreteSyntax (ConstructorNames (..), DataConName, GlobalName, ModuleImport (..), ModuleName, TyConName)
-
-import Data.Function (on)
 
 -----------------------------------------
 
@@ -37,7 +37,6 @@ import Data.Function (on)
 -- and alpha-equality function. The abstract type `Name` from
 -- this library is indexed by the AST type that this variable
 -- is a name for.
-
 type TName = Unbound.Name Term
 
 -----------------------------------------
@@ -98,14 +97,12 @@ data Term
     Subst Term Term
   | -- | witness to an equality contradiction
     Contra Term
-
   | -- | type constructors (fully applied)
     TyCon TyConName [Arg]
   | -- | term constructors (fully applied)
     DataCon DataConName [Arg]
   | -- | case analysis  `case a of matches`
     Case Term [Match]
-
   deriving (Show, Generic)
 
 -- | An argument to a function
@@ -140,7 +137,6 @@ data Pattern
   | PatVar TName
   deriving (Show, Eq, Generic, Typeable, Unbound.Alpha, Unbound.Subst Term)
 
-
 -----------------------------------------
 
 -- * Modules and declarations
@@ -152,13 +148,13 @@ data Pattern
 data Module = Module
   { moduleName :: ModuleName,
     moduleImports :: [ModuleImport],
-    moduleEntries :: [ModuleEntry] ,
+    moduleEntries :: [ModuleEntry],
     moduleConstructors :: ConstructorNames
   }
   deriving (Show, Generic, Typeable, Unbound.Alpha)
 
 -- | A type declaration
-data TypeDecl = TypeDecl {declName :: TName , declEp :: Epsilon  , declType :: Type}
+data TypeDecl = TypeDecl {declName :: TName, declEp :: Epsilon, declType :: Type}
   deriving (Show, Generic, Typeable, Unbound.Alpha, Unbound.Subst Term)
 
 -- | Declare the type of a term
@@ -236,57 +232,63 @@ initialConstructorNames = ConstructorNames initialTCNames initialDCNames
 -- | prelude names for built-in datatypes
 sigmaName :: TyConName
 sigmaName = "Sigma"
+
 prodName :: DataConName
 prodName = "Prod"
+
 boolName :: TyConName
 boolName = "Bool"
+
 trueName :: DataConName
 trueName = "True"
+
 falseName :: DataConName
 falseName = "False"
+
 tyUnitName :: TyConName
 tyUnitName = "Unit"
+
 litUnitName :: DataConName
 litUnitName = "()"
 
 initialTCNames :: Set TyConName
 initialTCNames = Set.fromList [sigmaName, boolName, tyUnitName]
+
 initialDCNames :: Set DataConName
 initialDCNames = Set.fromList [prodName, trueName, falseName, litUnitName]
 
-
 preludeDataDecls :: [ModuleEntry]
 preludeDataDecls =
-  [ ModuleData sigmaName  sigmaTele      [prodConstructorDef]
-  , ModuleData tyUnitName (Telescope []) [unitConstructorDef]
-  , ModuleData boolName   (Telescope []) [falseConstructorDef, trueConstructorDef]
-  ]  where
-        -- boolean
-        trueConstructorDef = ConstructorDef internalPos trueName (Telescope [])
-        falseConstructorDef = ConstructorDef internalPos falseName (Telescope [])
+  [ ModuleData sigmaName sigmaTele [prodConstructorDef],
+    ModuleData tyUnitName (Telescope []) [unitConstructorDef],
+    ModuleData boolName (Telescope []) [falseConstructorDef, trueConstructorDef]
+  ]
+  where
+    -- boolean
+    trueConstructorDef = ConstructorDef internalPos trueName (Telescope [])
+    falseConstructorDef = ConstructorDef internalPos falseName (Telescope [])
 
-        -- unit
-        unitConstructorDef = ConstructorDef internalPos litUnitName (Telescope [])
+    -- unit
+    unitConstructorDef = ConstructorDef internalPos litUnitName (Telescope [])
 
-        -- Sigma-type
-        sigmaTele = Telescope [declA, declB]
-        prodConstructorDef = ConstructorDef internalPos prodName (Telescope [declX, declY])
-        declA = mkDecl aName TyType
-        declB = mkDecl bName (TyPi Rel (Var aName) (Unbound.bind xName TyType))
-        declX = mkDecl xName (Var aName)
-        declY = mkDecl yName (App (Var bName) (Arg Rel (Var xName)))
-        aName = Unbound.string2Name "a"
-        bName = Unbound.string2Name "b"
+    -- Sigma-type
+    sigmaTele = Telescope [declA, declB]
+    prodConstructorDef = ConstructorDef internalPos prodName (Telescope [declX, declY])
+    declA = mkDecl aName TyType
+    declB = mkDecl bName (TyPi Rel (Var aName) (Unbound.bind xName TyType))
+    declX = mkDecl xName (Var aName)
+    declY = mkDecl yName (App (Var bName) (Arg Rel (Var xName)))
+    aName = Unbound.string2Name "a"
+    bName = Unbound.string2Name "b"
 
-        internalPos :: SourcePos
-        internalPos = initialPos "prelude"
-
-
+    internalPos :: SourcePos
+    internalPos = initialPos "prelude"
 
 -----------------------------------------
+
 -- * Auxiliary functions on syntax
------------------------------------------
 
+-----------------------------------------
 
 -- | Remove source positions and type annotations from the top level of a term
 strip :: Term -> Term
@@ -303,10 +305,10 @@ unPos _ = Nothing
 unPosFlaky :: Term -> SourcePos
 unPosFlaky t = fromMaybe (newPos "unknown location" 0 0) (unPos t)
 
-
-
 -----------------------------------------
+
 -- * Unbound library
+
 -----------------------------------------
 
 -- We use the unbound-generics library to mark the binding occurrences of
@@ -343,8 +345,9 @@ unbind2 :: (Unbound.Fresh m) => Unbound.Bind TName Term -> Unbound.Bind TName Te
 unbind2 b1 b2 = do
   o <- Unbound.unbind2 b1 b2
   case o of
-      Just (x,t,_,u) -> return (x,t,u)
-      Nothing -> error "impossible"
+    Just (x, t, _, u) -> return (x, t, u)
+    Nothing -> error "impossible"
+
 ------------------
 
 -- * `Alpha` class instances
@@ -361,7 +364,6 @@ instance Unbound.Alpha Term where
   aeq' :: Unbound.AlphaCtx -> Term -> Term -> Bool
   aeq' ctx a b = (Unbound.gaeq ctx `on` from) (strip a) (strip b)
 
-
 -- For example, all occurrences of annotations and source positions
 -- are ignored by this definition.
 
@@ -370,7 +372,6 @@ instance Unbound.Alpha Term where
 
 -- '(Bool, Bool:Type)' is alpha-equivalent to (Bool, Bool)
 -- >>> aeq (Prod TyBool (Ann TyBool TyType)) (Prod TyBool TyBool)
-
 
 -- At the same time, the generic operation equates terms that differ only
 -- in the names of bound variables.
@@ -393,8 +394,6 @@ idy = Lam Rel (Unbound.bind yName (Var yName))
 
 -- >>> aeq idx idy
 
-
-
 ---------------
 
 -- * Substitution
@@ -409,7 +408,6 @@ instance Unbound.Subst Term Term where
   isvar (Var x) = Just (Unbound.SubstName x)
   isvar _ = Nothing
 
-
 -- '(y : x) -> y'
 pi1 :: Term
 pi1 = TyPi Rel (Var xName) (Unbound.bind yName (Var yName))
@@ -422,11 +420,8 @@ pi2 = TyPi Rel TyBool (Unbound.bind yName (Var yName))
 
 -----------------
 
-
 -- Substitutions ignore source positions
 instance Unbound.Subst b SourcePos where
-    subst _ _ = id
-    substs _ = id
-    substBvs _ _ = id
-
-
+  subst _ _ = id
+  substs _ = id
+  substBvs _ _ = id

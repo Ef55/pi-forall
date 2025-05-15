@@ -4,7 +4,7 @@ module PiForall.Unbound.NameResolution where
 
 import AutoEnv (LocalName (..), internalName)
 import Control.Monad.Identity (Identity, runIdentity)
-import Control.Monad.State (State, StateT (..), evalStateT, runStateT, gets, modify)
+import Control.Monad.State (State, StateT (..), evalStateT, gets, modify, runStateT)
 import Data.Map qualified as Map
 import Data.Maybe qualified as Maybe
 import PiForall.ConcreteSyntax qualified as C

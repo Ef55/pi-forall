@@ -9,11 +9,11 @@ module PiForall.Unbound.Environment
     lookupTy,
     lookupTyMaybe,
     lookupDef,
-    lookupHint ,
+    lookupHint,
     lookupTCon,
     lookupDCon,
     lookupDConAll,
-    extendCtxTele  ,
+    extendCtxTele,
     getCtx,
     getLocalCtx,
     extendCtx,
@@ -30,15 +30,12 @@ module PiForall.Unbound.Environment
     Err (..),
     withStage,
     checkStage,
-    dispErr
+    dispErr,
   )
 where
 
-import Data.List
-import Data.Maybe ( listToMaybe )
 -- import PrettyPrint ( SourcePos, render, D(..), Disp(..), Doc )
-import PiForall.Unbound.Syntax
-import qualified Unbound.Generics.LocallyNameless as Unbound
+
 import Control.Monad (unless)
 import Control.Monad.Except
   ( ExceptT,
@@ -52,12 +49,14 @@ import Control.Monad.Reader
     ask,
     asks,
   )
-import PiForall.PrettyPrint
-import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
-import PiForall.Unbound.NameResolution (NameResolution(..), nominalize)
+import Data.List
+import Data.Maybe (listToMaybe)
 import PiForall.ConcreteSyntax qualified as C
-
-
+import PiForall.PrettyPrint
+import PiForall.Unbound.NameResolution (NameResolution (..), nominalize)
+import PiForall.Unbound.Syntax
+import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
+import Unbound.Generics.LocallyNameless qualified as Unbound
 
 -- | The type checking Monad includes a reader (for the
 -- environment), freshness state (for supporting locally-nameless
@@ -75,7 +74,7 @@ runTcMonad env m =
 
 -- | Marked locations in the source code
 data SourceLocation where
-  SourceLocation :: forall a. Display a => SourcePos -> a -> SourceLocation
+  SourceLocation :: forall a. (Display a) => SourcePos -> a -> SourceLocation
 
 -- | Environment manipulation and accessing functions
 -- The context 'gamma' is a list
@@ -93,15 +92,15 @@ data Env = Env
     sourceLocation :: [SourceLocation]
   }
 
-
-
 -- | The initial environment.
 emptyEnv :: Env
-emptyEnv = Env {ctx = preludeDataDecls
-               , globals = length preludeDataDecls
-               , hints = []
-               , sourceLocation = []
-              }
+emptyEnv =
+  Env
+    { ctx = preludeDataDecls,
+      globals = length preludeDataDecls,
+      hints = [],
+      sourceLocation = []
+    }
 
 -- instance Disp Env where
 --   disp :: Env -> Doc
@@ -113,7 +112,7 @@ emptyEnv = Env {ctx = preludeDataDecls
 lookupHint :: (MonadReader Env m) => TName -> m (Maybe TypeDecl)
 lookupHint v = do
   hints <- asks hints
-  return $ listToMaybe [ sig | sig <- hints, v == declName sig]
+  return $ listToMaybe [sig | sig <- hints, v == declName sig]
 
 -- | Find a name's type in the context.
 lookupTyMaybe ::
@@ -122,17 +121,16 @@ lookupTyMaybe ::
   m (Maybe TypeDecl)
 lookupTyMaybe v = do
   ctx <- asks ctx
-  return $ go ctx where
+  return $ go ctx
+  where
     go [] = Nothing
     go (ModuleDecl sig : ctx)
       | v == declName sig = Just sig
       | otherwise = go ctx
-
     go (_ : ctx) = go ctx
 
 demoteDecl :: Epsilon -> TypeDecl -> TypeDecl
-demoteDecl ep s = s { declEp = min ep (declEp s) }
-
+demoteDecl ep s = s {declEp = min ep (declEp s)}
 
 -- | Find the type of a name specified in the context
 -- throwing an error if the name doesn't exist
@@ -200,7 +198,7 @@ lookupDConAll v = do
         Nothing -> scanGamma g
         Just c -> do
           more <- scanGamma g
-          return $ (v', (delta, c)) :  more
+          return $ (v', (delta, c)) : more
     scanGamma (_ : g) = scanGamma g
 
 -- | Given the name of a data constructor and the type that it should
@@ -228,12 +226,10 @@ lookupDCon c tname = do
             ++ map (DN @C.ConstructorDef . snd . snd) matches
         )
 
-
-
 -- | Extend the context with a new entry
 extendCtx :: (MonadReader Env m) => ModuleEntry -> m a -> m a
 extendCtx d =
-  local (\m@Env{ctx = cs} -> m {ctx = d : cs})
+  local (\m@Env {ctx = cs} -> m {ctx = d : cs})
 
 -- | Extend the context with a list of bindings
 extendCtxs :: (MonadReader Env m) => [ModuleEntry] -> m a -> m a
@@ -258,10 +254,8 @@ extendCtxTele (ModuleDef x t2 : tele) m =
   extendCtx (ModuleDef x t2) $ extendCtxTele tele m
 extendCtxTele (ModuleDecl decl : tele) m =
   extendCtx (ModuleDecl decl) $ extendCtxTele tele m
-extendCtxTele ( _ : tele) m =
+extendCtxTele (_ : tele) m =
   err [DS "Invalid telescope ", DN tele]
-
-
 
 -- | Extend the context with a module
 -- Note we must reverse the order.
@@ -273,11 +267,11 @@ extendCtxMods :: (MonadReader Env m) => [Module] -> m a -> m a
 extendCtxMods mods k = foldr extendCtxMod k mods
 
 -- | Get the complete current context
-getCtx :: MonadReader Env m => m [ModuleEntry]
+getCtx :: (MonadReader Env m) => m [ModuleEntry]
 getCtx = asks ctx
 
 -- | Get the prefix of the context that corresponds to local variables.
-getLocalCtx :: MonadReader Env m => m [ModuleEntry]
+getLocalCtx :: (MonadReader Env m) => m [ModuleEntry]
 getLocalCtx = do
   g <- asks ctx
   glen <- asks globals
@@ -289,7 +283,7 @@ extendSourceLocation p t =
   local (\e@Env {sourceLocation = locs} -> e {sourceLocation = SourceLocation p t : locs})
 
 -- | access current source location
-getSourceLocation :: MonadReader Env m => m [SourceLocation]
+getSourceLocation :: (MonadReader Env m) => m [SourceLocation]
 getSourceLocation = asks sourceLocation
 
 -- | Add a type hint
@@ -299,8 +293,8 @@ extendHints h = local (\m@Env {hints = hs} -> m {hints = h : hs})
 -- | An error that should be reported to the user
 data Err = Err [SourceLocation] (Doc ())
 
-data D =
-  DS String
+data D
+  = DS String
   | DD (Doc ())
   | forall a. (Display a) => DC a
   | forall a' a. (NameResolution a' a, Display a') => DN a
@@ -312,7 +306,7 @@ ddisp (DC a) = disp a
 ddisp (DN a) = disp $ nominalize a
 
 -- | Augment the error message with addition information
-extendErr :: MonadError Err m => m a -> [D] -> m a
+extendErr :: (MonadError Err m) => m a -> [D] -> m a
 extendErr ma d =
   ma `catchError` \(Err ps msg) -> do
     let msg' = ddisp <$> d
@@ -329,9 +323,9 @@ instance Monoid Err where
 dispErr :: Err -> (Doc ())
 dispErr (Err [] msg) = msg
 dispErr (Err ((SourceLocation p term) : _) msg) =
-    display p initDI
-      <+> nest 2 msg
-      <+> nest 2 (pretty "In the expression" <+> nest 2 (disp term))
+  display p initDI
+    <+> nest 2 msg
+    <+> nest 2 (pretty "In the expression" <+> nest 2 (disp term))
 
 -- instance Disp Err where
 --   disp :: Err -> Doc
@@ -365,4 +359,3 @@ checkStage ep1 = do
 withStage :: (MonadReader Env m) => Epsilon -> m a -> m a
 withStage Irr = extendCtx (Demote Rel)
 withStage ep = id
-
