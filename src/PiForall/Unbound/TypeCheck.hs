@@ -16,6 +16,9 @@ import PiForall.Unbound.Syntax
 import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
 import Unbound.Generics.LocallyNameless qualified as Unbound
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import qualified Data.List as List
+import PiForall.Log
+import Control.Monad.Writer (MonadWriter(..))
 
 ---------------------------------------------------------------------
 
@@ -450,7 +453,7 @@ tcModules = foldM tcM []
     defs `tcM` m = do
       -- "M" is for "Module" not "monad"
       let name = moduleName m
-      liftIO $ putStrLn $ "Checking module " ++ show name
+      tell $ List.singleton $ Info $ "Checking module " ++ show name
       m' <- defs `tcModule` m
       return $ defs ++ [m']
 
@@ -519,7 +522,7 @@ tcEntry (ModuleDecl decl) = do
   duplicateTypeBindingCheck decl
   tcType (declType decl)
   return $ AddHint decl
--- tcEntry (Demote ep) = return (AddCtx [Demote ep])
+tcEntry (Demote ep) = return (AddCtx [Demote ep])
 
 -- rule Entry_data
 tcEntry (ModuleData t (Telescope delta) cs) =

@@ -25,7 +25,7 @@ unresolveG = return . show
 
 instance NameResolution LocalName S.TName where
   resolve (LocalName x) = return $ Unbound.string2Name x
-  unresolve = return . LocalName . Unbound.name2String
+  unresolve = return . LocalName . takeWhile (/= '$') . Unbound.name2String
 
 instance NameResolution C.Pattern S.Pattern where
   resolve p = evalStateT (iter p) Map.empty

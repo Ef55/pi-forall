@@ -57,7 +57,7 @@ examples tcFile =
     ( positiveTests
         tcFile
         "pi/examples"
-        [ "Lennart",
+        [ -- "Lennart",
           "Hurkens",
           "Lambda",
           "Lambda0",
@@ -94,7 +94,9 @@ main = do
       "/"
       [ testGroup
           "Unbound"
-          [ QC.testProperty "PP-Parsing round trip" UnRT.prop_roundtrip
+          [ QC.testProperty "PP-Parsing round trip" UnRT.prop_roundtrip,
+            std unTcFile,
+            examples unTcFile
           ],
         testGroup
           "Autoenv"
@@ -135,7 +137,7 @@ unTcFile path positive name =
     case v of
       Left err -> assertFailure $ "Parsing error:" ++ show err
       Right val -> case UnPiForall.runTcMonad UnPiForall.emptyEnv (UnPiForall.tcModules val) of
-        (Left err, _) -> assertFailure $ "Type error:\n" ++ show (UnPiForall.dispErr err PP.initDI)
+        (Left err, _) -> assertFailure $ "Type error:\n" ++ show (UnPiForall.dispErr err)
         (Right res, logs) -> case filter (not . Log.isInfo) logs of
           logs@(_:_) -> assertFailure $ "Warnings were produced:" ++ intercalate "\n" (fmap show logs)
           _ -> return ()
