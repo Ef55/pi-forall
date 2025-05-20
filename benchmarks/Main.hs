@@ -23,6 +23,7 @@ main =
       bgroup
         "Typechecking"
         [ b "Compiler" "pi/examples/Compiler.pi",
-          b "AVL" "pi/examples/AVL.pi"
+          b "AVL (System F)" "pi/examples/AVL_F.pi",
+          b "AVL (Dependently-typed)" "pi/examples/AVL.pi"
         ]
     ]
