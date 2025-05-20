@@ -69,27 +69,6 @@ inferType a = case a of
   -- remember the current position in the type checking monad
   (Pos p a) ->
     Env.extendSourceLocation p (NameResolution.nominalize a) $ inferType a
-  -- Extensions to the core language
-  -- i-unit
-  TyUnit -> return TyType
-  LitUnit -> return TyUnit
-  -- i-bool
-  TyBool -> return TyType
-  -- i-true/false
-  (LitBool _) -> return TyBool
-  -- i-if
-  (If a b1 b2) -> do
-    checkType a TyBool
-    tyA <- inferType b1
-    checkType b2 tyA
-    return tyA
-
-  -- i-sigma
-  (TySigma tyA bnd) -> do
-    (x, tyB) <- unbind bnd
-    tcType tyA
-    Env.extendCtx (promote $ mkDecl x tyA) $ tcType tyB
-    return TyType
   -- i-eq
   (TyEq a b) -> do
     aTy <- inferType a
@@ -188,42 +167,6 @@ checkType tm ty = do
           DS "\nGoal:",
           DN ty'
         ]
-
-    -- Extensions to the core language
-    -- c-if
-    (If a b1 b2) -> do
-      checkType a TyBool
-      dtrue <- Equal.unify [] a (LitBool True)
-      dfalse <- Equal.unify [] a (LitBool False)
-      Env.extendCtxs (promote <$> dtrue) $ checkType b1 ty'
-      Env.extendCtxs (promote <$> dfalse) $ checkType b2 ty'
-    -- c-prod
-    (Prod a b) -> do
-      case ty' of
-        (TySigma tyA bnd) -> do
-          (x, tyB) <- unbind bnd
-          checkType a tyA
-          Env.extendCtxs [promote $ mkDecl x tyA, ModuleDef x a] $ checkType b tyB
-        _ ->
-          Env.err
-            [ DS "Products must have Sigma Type",
-              DN ty,
-              DS "found instead"
-            ]
-
-    -- c-letpair
-    (LetPair p bnd) -> do
-      ((x, y), body) <- Unbound.unbind bnd
-      pty <- inferType p
-      pty' <- Equal.whnf pty
-      case pty' of
-        TySigma tyA bnd' -> do
-          let tyB = instantiate bnd' (Var x)
-          decl <- Equal.unify [] p (Prod (Var x) (Var y))
-          Env.extendCtxs (promote <$> ([mkDecl x tyA, mkDecl y tyB] ++ decl)) $
-            checkType body ty'
-        _ -> Env.err [DS "Scrutinee of LetPair must have Sigma type"]
-
     -- c-let
     (Let a bnd) -> do
       (x, b) <- unbind bnd
@@ -260,9 +203,6 @@ checkType tm ty = do
       case (a', b') of
         (DataCon da _, DataCon db _)
           | da /= db ->
-              return ()
-        (LitBool b1, LitBool b2)
-          | b1 /= b2 ->
               return ()
         (_, _) ->
           Env.err
@@ -348,8 +288,6 @@ tcArgTele [] _ =
   Env.err [DS "Too few arguments provided."]
 tcArgTele _ [] =
   Env.err [DS "Too many arguments provided."]
-tcArgTele _ tele =
-  Env.err [DS "Invalid telescope", DN (Telescope tele)]
 
 -- | Substitute a list of terms for the variables bound in a telescope
 -- This is used to instantiate the parameters of a data constructor
@@ -378,8 +316,6 @@ doSubst ss (Decl decl : tele') = do
   let decl' = decl {declType = tynf}
   tele'' <- doSubst ss tele'
   return $ Decl decl' : tele''
-doSubst _ tele =
-  Env.err [DS "Invalid telescope", DN $ Telescope tele]
 
 -----------------------------------------------------------
 
@@ -410,7 +346,6 @@ declarePats dc ((pat, _) : pats) (Decl (TypeDecl x ep ty) : tele) = do
 declarePats dc [] [] = return []
 declarePats dc [] _ = Env.err [DS "Not enough patterns in match for data constructor", DS dc]
 declarePats dc pats [] = Env.err [DS "Too many patterns in match for data constructor", DS dc]
-declarePats dc _ _ = Env.err [DS "Invalid telescope", DS dc]
 
 -- | Convert a pattern to a term
 pat2Term :: Pattern -> Term
@@ -503,7 +438,7 @@ tcEntry (ModuleDef n term) = do
           ty <- inferType term
           return $ AddCtx [ModuleDecl (TypeDecl n Rel ty), ModuleDef n term]
         Just decl -> do
-          (Env.extendCtx (ModuleDecl decl) $ checkType term (declType decl))
+          Env.extendCtx (ModuleDecl decl) (checkType term (declType decl))
             `Env.extendErr` [ DS "When checking the term",
                               DN term,
                               DS "against the type",

@@ -43,29 +43,6 @@ equate t1 t2 = do
       equate tyB1 tyB2
     (TrustMe, TrustMe) -> return ()
     (PrintMe, PrintMe) -> return ()
-    (TyUnit, TyUnit) -> return ()
-    (LitUnit, LitUnit) -> return ()
-    (TyBool, TyBool) -> return ()
-    (LitBool b1, LitBool b2) | b1 == b2 -> return ()
-    (If a1 b1 c1, If a2 b2 c2) -> do
-      equate a1 a2
-      equate b1 b2
-      equate c1 c2
-    (Let rhs1 bnd1, Let rhs2 bnd2) -> do
-      (x, body1, body2) <- unbind2 bnd1 bnd2
-      equate rhs1 rhs2
-      equate body1 body2
-    (TySigma tyA1 bnd1, TySigma tyA2 bnd2) -> do
-      (x, tyB1, tyB2) <- unbind2 bnd1 bnd2
-      equate tyA1 tyA2
-      equate tyB1 tyB2
-    (Prod a1 b1, Prod a2 b2) -> do
-      equate a1 a2
-      equate b1 b2
-    (LetPair s1 bnd1, LetPair s2 bnd2) -> do
-      equate s1 s2
-      ((x, y), body1, _, body2) <- Unbound.unbind2Plus bnd1 bnd2
-      equate body1 body2
     (TyEq a b, TyEq c d) -> do
       equate a c
       equate b d
@@ -172,18 +149,6 @@ whnf (App t1 t2) = do
       whnf (instantiate bnd (unArg t2))
     _ -> do
       return (App nf t2)
-whnf (If t1 t2 t3) = do
-  nf <- whnf t1
-  case nf of
-    (LitBool bo) -> if bo then whnf t2 else whnf t3
-    _ -> return (If nf t2 t3)
-whnf (LetPair a bnd) = do
-  nf <- whnf a
-  case nf of
-    Prod b1 c -> do
-      whnf (Unbound.instantiate bnd [b1, c])
-    _ -> return (LetPair nf bnd)
-
 -- ignore/remove type annotations and source positions when normalizing
 whnf (Ann tm _) = whnf tm
 whnf (Pos _ tm) = whnf tm
@@ -235,7 +200,6 @@ unify ns tx ty = do
       (Var x, Var y) | x == y -> return []
       (Var y, yty) | y `notElem` ns -> return [Def y yty]
       (yty, Var y) | y `notElem` ns -> return [Def y yty]
-      (Prod a1 a2, Prod b1 b2) -> unifyArgs [Arg Rel a1, Arg Rel a2] [Arg Rel b1, Arg Rel b2]
       (TyEq a1 a2, TyEq b1 b2) -> (++) <$> unify ns a1 b1 <*> unify ns a2 b2
       (TyCon s1 tms1, TyCon s2 tms2)
         | s1 == s2 -> unifyArgs tms1 tms2
@@ -270,8 +234,6 @@ unify ns tx ty = do
 -- solutions.
 amb :: Term -> Bool
 amb (App t1 t2) = True
-amb If {} = True
-amb (LetPair _ _) = True
 amb (Case _ _) = True
 amb (Subst _ _) = True
 amb _ = False

@@ -73,22 +73,6 @@ data Term
   | -- | let expression, introduces a new (non-recursive) definition in the ctx
     -- | `let x = a in b`
     Let Term (Unbound.Bind TName Term)
-  | -- | the type with a single inhabitant, called `Unit`
-    TyUnit
-  | -- | the inhabitant of `Unit`, written `()`
-    LitUnit
-  | -- | the type with two inhabitants (homework) `Bool`
-    TyBool
-  | -- | `True` and `False`
-    LitBool Bool
-  | -- | `if a then b1 else b2` expression for eliminating booleans
-    If Term Term Term
-  | -- | Sigma-type (homework), written `{ x : A | B }`
-    TySigma Term (Unbound.Bind TName Term)
-  | -- | introduction form for Sigma-types `( a , b )`
-    Prod Term Term
-  | -- | elimination form for Sigma-types `let (x,y) = a in b`
-    LetPair Term (Unbound.Bind (TName, TName) Term)
   | -- | Equality type  `a = b`
     TyEq Term Term
   | -- | Proof of equality `Refl`
@@ -411,10 +395,6 @@ instance Unbound.Subst Term Term where
 -- '(y : x) -> y'
 pi1 :: Term
 pi1 = TyPi Rel (Var xName) (Unbound.bind yName (Var yName))
-
--- '(y : Bool) -> y'
-pi2 :: Term
-pi2 = TyPi Rel TyBool (Unbound.bind yName (Var yName))
 
 -- >>> Unbound.aeq (Unbound.subst xName TyBool pi1) pi2
 

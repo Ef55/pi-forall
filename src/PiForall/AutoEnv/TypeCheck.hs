@@ -166,20 +166,31 @@ checkType tm ty = do
           DU ty'
         ]
 
-    -- c-let -- treat like immediate application
     (Let a bnd) -> do
       let (x, b) = Local.unbindl bnd
       tyA <- inferType a
-      -- TODO: why do we need an annotation?
+      -- Shift the right-hand-side into the extended scope
       let ty'' = applyE @Term shift1E ty'
       let a' = applyE @Term shift1E a
       Scope.withScopeSize $
+        -- Add binding to scope
+        -- Add binding to scope
+        -- Add binding to scope
+        -- Add binding to scope
+
+        -- Add binding to scope
         Scope.push1 x tyA $
+          -- Remember the (definitional) equality
+          -- Remember the (definitional) equality
+          -- Remember the (definitional) equality
+          -- Remember the (definitional) equality
+
+          -- Remember the (definitional) equality
           Equal.pushRefinement FZ a' $
             checkType b ty''
-    TmRefl -> do
-      (a, b) <- Env.mapScope (const Const) $ Equal.ensureEq ty
-      Env.mapScope (const Const) $ Equal.equate a b
+    TmRefl -> Env.mapScope (const Const) $ do
+      (a, b) <- Equal.ensureEq ty
+      Equal.equate a b
 
     -- c-subst
     tm@(Subst a b) -> Scope.withScopeSize $ do
@@ -278,32 +289,6 @@ getSomePat (Branch bnd) = Some1 (Pat.getPat bnd)
 -- type checking datatype definitions, type constructor applications and
 -- data constructor applications
 ---------------------------------------------------------------------
-
--- type Telesubst p n = Vec p (Term n)
-
--- listToSubst :: SNatI p => [Term n] -> TcMonad n (Telesubst p n)
--- -- TODO: improve error message.
--- listToSubst l = Vec.fromList l `Env.whenNothing` [DS "Incorrect number of arguments for telescope."]
-
--- tcTypeTele :: forall p n. Telescope p n -> TcMonad n ()
--- tcTypeTele TNil = return ()
--- tcTypeTele (TCons h t) = case h of
---   LocalDecl x ty -> do
---     tcType ty
---     Scope.push1 (x, ty) $ tcTypeTele t
---   LocalDef x d -> do
---     Equal.pushRefinement (x, d) $ tcTypeTele t
-
--- instantiateTelescope :: forall p n a. Telesubst p n -> Telescope p n -> (Env Term (p + n) n -> TcMonad n a) -> TcMonad n a
--- instantiateTelescope VNil TNil k = k idE
--- instantiateTelescope ss (TCons (LocalDef x d) tele') k = do
---   Equal.pushRefinement (x, d) $ instantiateTelescope ss tele'
--- instantiateTelescope (s ::: ss) (TCons (LocalDecl x ty) tele') k = do
---   checkType s ty
---   Equal.pushRefinement (x, s, ty) $ instantiateTelescope (applyE shift1E <$> ss) tele' k
-
--- tcSubst :: forall n p. [Term n] -> Telescope p n -> TcMonad n ()
--- tcSubst s p = instantiateTelescope s p $ return ()
 
 -- | Check all of the types contained within a telescope
 tcTypeTele ::
@@ -570,7 +555,7 @@ tcEntry (ModuleDef n term) =
             return $ AddCtx [ModuleDecl n ty, ModuleDef n term]
           Just ty -> do
             let decl = ModuleDecl n ty
-            (Env.extendCtx decl $ checkType term ty)
+            Env.extendCtx decl (checkType term ty)
               `Env.extendErr` [ DS "When checking the term",
                                 DU term,
                                 DS "against the type",
