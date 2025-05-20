@@ -104,7 +104,6 @@ instance NameResolution C.Term S.Term where
     S.TyCon n args -> C.TyCon n <$> mapM unresolveArg args
     S.DataCon n args -> C.DataCon n <$> mapM unresolveArg args
     S.Case s bs -> C.Case <$> unresolve s <*> mapM unresolve bs
-    _ -> error "WIP"
     where
       unresolveArg (S.Arg _ t) = unresolve t
 
@@ -120,19 +119,19 @@ instance NameResolution C.ConstructorDef S.ConstructorDef where
 
 instance NameResolution C.ModuleEntry S.ModuleEntry where
   resolve e = case e of
-    C.ModuleDecl n t -> S.ModuleDecl <$> S.TypeDecl (Unbound.string2Name n) S.Rel <$> resolve t
+    C.ModuleDecl n t -> S.ModuleDecl . S.TypeDecl (Unbound.string2Name n) S.Rel <$> resolve t
     C.ModuleDef n t -> S.ModuleDef (Unbound.string2Name n) <$> resolve (t :: C.Term)
     C.ModuleData n (C.DataDef params ty cstrs) -> do
       -- TODO: what about ty?
       params' <- resolve params
       cstrs' <- mapM resolve cstrs
       return $ S.ModuleData n params' cstrs'
-    C.ModuleFail _ -> error "WIP"
+    C.ModuleFail _ -> error "Unsupported keyword in unbound implementation: Fail"
   unresolve e = case e of
     S.ModuleDecl (S.TypeDecl n _ t) -> C.ModuleDecl <$> unresolveG n <*> unresolve t
     S.ModuleDef n t -> C.ModuleDef <$> unresolveG n <*> unresolve t
     S.ModuleData n params cstrs -> C.ModuleData n <$> (C.DataDef <$> unresolve params <*> return C.TyType <*> mapM unresolve cstrs)
-    _ -> error "WIP"
+    S.Demote _ -> error "Unsupported feature in concrete syntax: Demotion"
 
 instance NameResolution C.Entry S.Entry where
   resolve e = case e of
