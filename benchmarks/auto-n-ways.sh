@@ -69,7 +69,7 @@ for variable in "${valid_variables[@]}"; do
   fi
 
   # Run benchmark
-  stack bench --benchmark-arguments="--output=$dest_dir/$variable.html Autoenv"
+  stack bench --benchmark-arguments="--output=$dest_dir/$variable.html --match=glob **/AutoEnv"
   if [ $? -ne 0 ]; then
     echo "Error: benchmark failed for variable '$variable'."
     restore_stack_yaml
