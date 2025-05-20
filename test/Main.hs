@@ -65,7 +65,8 @@ examples tcFile =
           "Lambda2",
           "Compiler",
           "Regex",
-          "AVL"
+          "AVL",
+          "AVL_F"
         ]
     )
 

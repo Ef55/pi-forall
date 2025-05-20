@@ -49,6 +49,14 @@ data Bias (n: Nat) (l: Nat) (r: Nat) (excess: Bool): Type where
   EXLeftHeavy of [n = Succ l] [l = Succ (Succ r)] [excess = True]
   EXRightHeavy of [n = Succ r] [r = Succ (Succ l)] [excess = True]
 
+bias_Succ: (n: Nat) -> (l: Nat) -> (r: Nat) -> (b: Bool) -> Bias n l r b -> {n' : Nat | n = Succ n'}
+bias_Succ = \ n l r b bias . case bias of
+  Balanced -> (l, Refl)
+  LeftHeavy -> (l, Refl)
+  RightHeavy -> (r, Refl)
+  EXLeftHeavy -> (l, Refl)
+  EXRightHeavy -> (r, Refl)
+
 data AVL_ (C: Comparable) (n: Nat) (excess: Bool): Type where
   Leaf of [n = Zero]
   Fork of [lh: Nat] (AVL_ C lh False) (T C) [rh: Nat] (AVL_ C rh False) (Bias n lh rh excess)
@@ -66,18 +74,16 @@ bias = \ C [n] t . case t of
   Fork [_] _ _ [_] _ bias -> bias
 
 isLeftHeavy : (C: Comparable) -> [n: Nat] -> (t: AVL_ C (Succ n) True) -> Bool
-isLeftHeavy = \ C [n] t . case t of
-  Fork [_] _ _ [_] _ bias -> case bias of
-    LeftHeavy -> True
-    EXLeftHeavy -> True
-    _ -> False
+isLeftHeavy = \ C [n] t . case (bias C n t) of
+  LeftHeavy -> True
+  EXLeftHeavy -> True
+  _ -> False
 
 isRightHeavy : (C: Comparable) -> [n: Nat] -> (t: AVL_ C (Succ n) True) -> Bool
-isRightHeavy = \ C [n] t . case t of
-  Fork [_] _ _ [_] _ bias -> case bias of
-    RightHeavy -> True
-    EXRightHeavy -> True
-    _ -> False
+isRightHeavy = \ C [n] t . case (bias C n t) of
+  RightHeavy -> True
+  EXRightHeavy -> True
+  _ -> False
 
 data MAVL_ (C: Comparable) (n: Nat) (canGrow: Bool) (canShrink: Bool): Type where
   Stable of (AVL_ C n False)
@@ -176,32 +182,38 @@ mergeBackRight = \ C [n] [lh] l m [rh] r b . case r of
 
 removeMin: (C: Comparable) -> [n: Nat] -> AVL_ C (Succ n) False -> (T C * MAVL_ C (Succ n) False True)
 removeMin = \ C [n] t . case t of
-  Fork [lh] l m [rh] r b -> case lh of
-    Zero -> case b of
+  Fork [lh] l m [rh] r b -> case l of
+    Leaf -> case b of
       Balanced -> (m, Shrink [rh] r)
       RightHeavy -> (m, Shrink [rh] r)
-    Succ lh' ->
-      let (min, l') = removeMin C [lh'] l in
-      (min, mergeBackLeft C [Succ n] [Succ lh'] l' m [rh] r b)
+    Fork [lh'] _ _ [rh'] _ bias ->
+      let (lh', LH) = bias_Succ lh lh' rh' False bias in
+      subst
+        let (min, l') = removeMin C [lh'] l in
+        (min, mergeBackLeft C [Succ n] [Succ lh'] l' m [rh] r b)
+      by LH
 
 remove_: (C: Comparable) -> [n: Nat] -> AVL_ C n False -> T C -> MAVL_ C n False True
 remove_ = \ C n t v . case t of
   Leaf -> Stable Leaf
   Fork [lh] l m [rh] r b -> case compare C v m of
     less [_] -> mergeBackLeft C [n] [lh] (remove_ C [lh] l v) m [rh] r b
-    equal -> case rh of
-      Zero -> case b of
+    equal -> case r of
+      Leaf -> case b of
         Balanced -> Shrink [lh] l
         LeftHeavy -> Shrink [lh] l
-      Succ rh' ->
-        let (m', r') = removeMin C [rh'] r in
-        mergeBackRight C [n] [lh] l m' [Succ rh'] r' b
+      Fork [lh'] _ _ [rh'] _ bias ->
+        let (rh', RH) = bias_Succ rh lh' rh' False bias in
+        subst
+          let (m', r') = removeMin C [rh'] r in
+          mergeBackRight C [n] [lh] l m' [Succ rh'] r' b
+        by RH
     greater [_] -> mergeBackRight C [n] [lh] l m [rh] (remove_ C [rh] r v) b
 
 linearize_ : (C: Comparable) -> [n: Nat] -> AVL_ C n False -> List (T C) -> List (T C)
 linearize_ = \ C [n] t acc . case t of
   Leaf -> acc
-  Fork [lh] l v [rh] r _ -> linearize_ C lh l (Cons v (linearize_ C rh r acc))
+  Fork [lh] l v [rh] r _ -> linearize_ C [lh] l (Cons v (linearize_ C [rh] r acc))
 
 --------------------------------------------------------------------------------
 --- The actual AVL API
