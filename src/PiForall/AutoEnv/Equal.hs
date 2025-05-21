@@ -6,8 +6,8 @@ import AutoEnv
 import AutoEnv.Bind.Local as L
 import AutoEnv.Bind.Pat as Pat
 import AutoEnv.Bind.Scoped as Scoped
-import AutoEnv.DependentScope
-import AutoEnv.DependentScope qualified as Scope
+import AutoEnv.MonadScoped
+import AutoEnv.MonadScoped qualified as Scope
 -- import AutoEnv.Env as Env
 import Control.Monad (foldM, unless, zipWithM, zipWithM_)
 import Control.Monad.Except (ExceptT, MonadError, catchError)
@@ -308,7 +308,7 @@ addRefinements r' r = do
 
 pushRefinements :: forall t n a. (SNatI n, SubstVar t) => Refinement Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
 pushRefinements nr m = do
-  ctx <- Scope.blob
+  ctx <- Scope.flatData
   ss <- Scope.scopeSize
   r <- addRefinements nr (Env.refinement ctx)
   local (\ctx -> ctx {Env.refinement = r}) m

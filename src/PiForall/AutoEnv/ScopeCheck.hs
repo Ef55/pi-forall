@@ -24,10 +24,10 @@ import AutoEnv.Bind.Pat qualified as Pat
 import AutoEnv.Bind.Scoped ((<:>))
 import AutoEnv.Bind.Scoped qualified as Scoped
 import AutoEnv.Bind.Single qualified as B
-import AutoEnv.DependentScope qualified as DS
+import AutoEnv.Scope qualified as DS
 import AutoEnv.Lib
-import AutoEnv.MonadScoped (ScopedReader)
-import AutoEnv.MonadScoped qualified as Scoped
+import AutoEnv.MonadNamed (ScopedReader)
+import AutoEnv.MonadNamed qualified as Scoped
 import Control.Monad (foldM)
 import Control.Monad qualified as Monad
 import Control.Monad.Reader (MonadReader (ask), Reader, asks, runReader)
