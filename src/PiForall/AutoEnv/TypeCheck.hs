@@ -11,7 +11,8 @@ import AutoEnv.Bind.Scoped qualified as Scoped
 import AutoEnv.Bind.Single qualified as B
 import AutoEnv.Context
 import AutoEnv.Context qualified as Context
-import AutoEnv.DependentScope qualified as Scope
+import AutoEnv.Scope qualified as Scope
+import AutoEnv.MonadScoped qualified as Scope
 import AutoEnv.Lib
 import Control.Monad
 import Control.Monad.Except
@@ -267,7 +268,7 @@ checkType tm ty = do
 
           -- add variables from pattern to context
           (pat, tm', rPat) <- declarePat pat (TyCon c args)
-          Scope.pushEnv pat $ do
+          Scope.pushScope pat $ do
             -- compare scrutinee and pattern: fails if branch is inaccessible
             rScrut <- Env.mapScope (const Const) $ Equal.unify False scrut'' tm'
 

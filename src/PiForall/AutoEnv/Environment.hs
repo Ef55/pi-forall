@@ -21,7 +21,8 @@ import AutoEnv
 import AutoEnv qualified
 import AutoEnv.Bind.Local qualified as Local
 import AutoEnv.Bind.Pat qualified as Pat
-import AutoEnv.DependentScope qualified as Scope
+import AutoEnv.Scope qualified as Scope
+import AutoEnv.MonadScoped qualified as Scoped
 import AutoEnv.Env (Shiftable, fromRefinement)
 import AutoEnv.MonadScoped qualified as SimpleScope
 import Control.Monad.Except
@@ -76,29 +77,29 @@ instance Shiftable TcEnv where
 
 type Scope t n = Scope.Scope LocalName t n Z
 
-type MonadScoped t = Scope.MonadScoped LocalName t TcEnv
+type MonadScoped t = Scoped.MonadScoped LocalName t TcEnv
 
 -- | The type checking Monad includes error (for error reporting) and IO
 -- (for warning messages).
 -- The Environment contains global declarations and definitions.
-newtype TcMonad t n a = TcMonad (Scope.ScopedReaderT LocalName t TcEnv (ExceptT Err (Writer [Log])) n a)
+newtype TcMonad t n a = TcMonad (Scoped.ScopedReaderT LocalName t TcEnv (ExceptT Err (Writer [Log])) n a)
   deriving (Functor, Applicative, Monad, MonadError Err, MonadWriter [Log])
 
 -- Find how to make it derivable
-instance (SubstVar t) => Scope.MonadScoped LocalName t TcEnv (TcMonad t) where
-  scope' = TcMonad Scope.scope'
-  pushEnv ext (TcMonad m) = TcMonad $ Scope.pushEnv ext m
-  blob = TcMonad Scope.blob
-  local f (TcMonad m) = TcMonad $ Scope.local f m
+instance (SubstVar t) => Scoped.MonadScoped LocalName t TcEnv (TcMonad t) where
+  sizedScope = TcMonad Scoped.sizedScope
+  pushScope ext (TcMonad m) = TcMonad $ Scoped.pushScope ext m
+  flatData = TcMonad Scoped.flatData
+  local f (TcMonad m) = TcMonad $ Scoped.local f m
 
 mapScope :: (forall n. s n -> s' n) -> TcMonad s' n a -> TcMonad s n a
-mapScope f (TcMonad m) = TcMonad $ Scope.mapScope id f m
+mapScope f (TcMonad m) = TcMonad $ Scoped.transform id f m
 
 -- | Entry point for the type checking monad, given an
 -- initial environment, returns either an error message
 -- or some result.
 runTcMonad :: TcMonad t Z a -> (Either Err a, [Log])
-runTcMonad (TcMonad m) = runWriter (runExceptT (Scope.runScopedReaderT m (Nat.SZ, Scope.empty, emptyEnv)))
+runTcMonad (TcMonad m) = runWriter (runExceptT (Scoped.runScopedReaderT m (Nat.SZ, Scope.empty, emptyEnv)))
 
 -- \| the current scope of local variables
 -- env_scope :: Scope LocalName n,
@@ -140,12 +141,12 @@ emptyEnv =
 -- | Find a name's user supplied type signature
 lookupHint :: (MonadScoped t m) => GlobalName -> m n (Maybe (Typ n))
 lookupHint v = do
-  hints <- hints <$> Scope.blob
+  hints <- hints <$> Scoped.flatData
   return $ listToMaybe [weakenClosed ty | (x, ty) <- hints, v == x]
 
 lookupGlobalTy :: (SubstVar t) => GlobalName -> TcMonad t n (Typ n)
 lookupGlobalTy v = do
-  env <- Scope.blob
+  env <- Scoped.flatData
   case [a | ModuleDecl v' a <- globals env, v == v'] of
     [a] -> return (weakenClosed a)
     _ -> do
@@ -156,7 +157,7 @@ lookupGlobalTy v = do
 
 lookupGlobalDef :: (SubstVar t) => GlobalName -> TcMonad t n (Term n)
 lookupGlobalDef v = do
-  env <- Scope.blob
+  env <- Scoped.flatData
   case [a | ModuleDef v' a <- globals env, v == v'] of
     [a] -> return (weakenClosed a)
     _ ->
@@ -168,11 +169,11 @@ lookupGlobalDef v = do
 -- | Find the datatype declaration of a type constructor in the context
 lookupTCon :: (SubstVar t) => TyConName -> TcMonad t n DataDef
 lookupTCon v = do
-  g <- globals <$> Scope.blob
+  g <- globals <$> Scoped.flatData
   scanGamma g
   where
     scanGamma [] = do
-      currentEnv <- globals <$> Scope.blob
+      currentEnv <- globals <$> Scoped.flatData
       err $
         [ DS "The type constructor",
           DC v,
@@ -193,7 +194,7 @@ lookupDConAll ::
   DataConName ->
   TcMonad t n [(TyConName, ScopedConstructorDef)]
 lookupDConAll v = do
-  g <- globals <$> Scope.blob
+  g <- globals <$> Scoped.flatData
   scanGamma g
   where
     scanGamma [] = return []
@@ -281,7 +282,7 @@ extendDecls d c@(Context gamma defs) = Context n gamma (d ++ defs)
 -- | Find the type of a local variable in the context
 -- This cannot fail
 lookupTy :: (MonadScoped Term m) => Fin n -> m n (Term n)
-lookupTy x = snd <$> Scope.fromScope x
+lookupTy x = snd <$> Scoped.get x
 
 -- | Extend the context with a new declaration
 extendTy :: Typ n -> Context n -> Context (S n)
@@ -295,12 +296,12 @@ extendLocal (LocalDecl x t) k ctx = k (extendTy t ctx)
 extendLocal (LocalDef x u) k ctx = error "TODO: local definitions unsupported"
 
 getRefinement :: (SubstVar t) => TcMonad t n (Refinement Term n)
-getRefinement = refinement <$> Scope.blob
+getRefinement = refinement <$> Scoped.flatData
 
 refine :: (SubstVar t) => Term n -> TcMonad t n (Term n)
 refine t = do
   r <- getRefinement
-  Scope.withScopeSize $ return $ AutoEnv.refine r t
+  Scoped.withScopeSize $ return $ AutoEnv.refine r t
 
 --------------------------------------------------------------------
 -- Source locations
@@ -312,8 +313,8 @@ data SourceLocation where
 -- | Push a new source position on the location stack.
 extendSourceLocation :: (ScopeCheck.Scoping n u s, Display u) => SourcePos -> s -> TcMonad Term n a -> TcMonad Term n a
 extendSourceLocation p t m = do
-  s <- Scope.scope'
-  Scope.local
+  s <- Scoped.sizedScope
+  Scoped.local
     ( \e@TcEnv {sourceLocation = locs} ->
         e {sourceLocation = SourceLocation p t s : locs}
     )
@@ -321,7 +322,7 @@ extendSourceLocation p t m = do
 
 -- | access current source location
 getSourceLocation :: (MonadScoped t m) => m n [SourceLocation]
-getSourceLocation = sourceLocation <$> Scope.blob
+getSourceLocation = sourceLocation <$> Scoped.flatData
 
 --------------------------------------------------------------------
 -- Errors
@@ -360,11 +361,11 @@ sdisplay :: (SubstVar t) => D n -> DispInfo -> TcMonad t n (Doc ())
 sdisplay (DS s) di = return $ PP.pretty s
 sdisplay (DD d) di = return d
 sdisplay (DC c) di = return $ disp c
-sdisplay (DU s) di = scopedDisplay s <$> Scope.scope'
+sdisplay (DU s) di = scopedDisplay s <$> Scoped.sizedScope
 sdisplay (DZ s) di = return $ scopedDisplay s (Nat.SZ, Scope.empty)
 sdisplay (DR r) di = do
-  ss <- Scope.scopeSize
-  s <- Scope.uscope <$> Scope.scope
+  ss <- Scoped.scopeSize
+  s <- Scope.uscope <$> Scoped.scope
   let r' = withSNat ss $ fromRefinement r
   let t' = toList $ withSNat ss $ ScopeCheck.unscopeUnder s (ss, r')
   let c :: [Doc ()] = (\(i, t) -> disp i <+> PP.pretty "|-->" <+> disp t) <$> zip (toList s) t'
@@ -372,8 +373,8 @@ sdisplay (DR r) di = do
 
 displayContext :: TcMonad Term n (D n)
 displayContext = do
-  ss <- Scope.scopeSize
-  s <- Scope.scope
+  ss <- Scoped.scopeSize
+  s <- Scoped.scope
   let t' = toList $ ScopeCheck.unscopeUnder Vec.empty (ss, s)
   let c :: [Doc ()] = (\(i, t) -> disp i <+> PP.pretty ":" <+> disp t) <$> t'
   return $ DD $ PP.vcat c
@@ -429,17 +430,17 @@ ensureError c = (Right <$> c) `catchError` \err -> return $ Left err
 
 -- | Add a type hint
 extendHints :: (MonadScoped t m) => (GlobalName, Typ Z) -> m n a -> m n a
-extendHints h = Scope.local (\m@TcEnv {hints = hs} -> m {hints = h : hs})
+extendHints h = Scoped.local (\m@TcEnv {hints = hs} -> m {hints = h : hs})
 
 -- | Extend the global environment with a new entry
 extendCtx :: (MonadScoped t m) => ModuleEntry -> m n a -> m n a
 extendCtx d =
-  Scope.local (\m@TcEnv {globals = cs} -> m {globals = d : cs})
+  Scoped.local (\m@TcEnv {globals = cs} -> m {globals = d : cs})
 
 -- | Extend the context with a list of global bindings
 extendCtxs :: (MonadScoped t m) => [ModuleEntry] -> m n a -> m n a
 extendCtxs ds =
-  Scope.local (\m@TcEnv {globals = cs} -> m {globals = ds ++ cs})
+  Scoped.local (\m@TcEnv {globals = cs} -> m {globals = ds ++ cs})
 
 -- | Extend the context with a module
 -- Note we must reverse the order
