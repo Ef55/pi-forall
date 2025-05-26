@@ -15,15 +15,13 @@ import Control.Monad.Reader (MonadReader, ReaderT)
 import Control.Monad.Writer (MonadWriter, Writer)
 import Data.SNat qualified as SNat
 import Data.Scoped.Const
-import PiForall.AutoEnv.Environment (Context, D (..))
+import PiForall.AutoEnv.Environment (TcMonad, Context, D (..))
 import PiForall.AutoEnv.Environment qualified as Env
 import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
 import PiForall.AutoEnv.Syntax
 import PiForall.Log (Log)
 import PiForall.PrettyPrint
 import Prettyprinter as PP
-
-type TcMonad = Env.TcMonad Const
 
 -- | compare two expressions for equality
 -- first check if they are alpha equivalent then
@@ -39,19 +37,19 @@ equate t1 t2 = do
     (TyType, TyType) -> return ()
     (Var x, Var y) | x == y -> return ()
     (Lam bnd1, Lam bnd2) -> do
-      Scope.push1u
+      Env.pushUntyped
         (Pat.getPat bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (App a1 a2, App b1 b2) ->
       equate a1 b1 >> equate a2 b2
     (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
       equate tyA1 tyA2
-      Scope.push1u
+      Env.pushUntyped
         (L.getLocalName bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (Let rhs1 bnd1, Let rhs2 bnd2) -> do
       equate rhs1 rhs2
-      Scope.push1u
+      Env.pushUntyped
         (L.getLocalName bnd1)
         (equate (L.getBody bnd1) (L.getBody bnd2))
     (TyCon c1 ts1, TyCon c2 ts2)
@@ -64,7 +62,7 @@ equate t1 t2 = do
           equate s1 s2
           -- require branches to be in the same order
           -- on both expressions
-          Scope.withScopeSize $ do
+          Env.withScopeSize $ do
             let matchBr :: Match n -> Match n -> TcMonad n ()
                 matchBr (Branch bnd1) (Branch bnd2) =
                   Pat.unbind bnd1 $ \p1 a1 ->
@@ -72,7 +70,7 @@ equate t1 t2 = do
                       Refl <-
                         patEq p1 p2
                           `Env.whenNothing` [DS "Cannot match branches in", DU n1, DS "and", DU n2]
-                      Scope.push p1 $ do
+                      Env.pushUntyped p1 $ do
                         equate a1 a2
             zipWithM_ matchBr brs1 brs2
     (TyEq a1 b1, TyEq a2 b2) -> do
@@ -209,10 +207,10 @@ whnf tm = do
 --  - In "best-effort" mode, failure indicates that there is no solution.
 unify :: forall n. Bool -> Term n -> Term n -> TcMonad n (Refinement Term n)
 unify strict t1 t2 = do
-  Scope.withScopeSize $ go SZ t1 t2
+  Env.withScopeSize $ go SZ t1 t2
   where
     go :: forall n p. (SNatI n) => SNat p -> Term (p + n) -> Term (p + n) -> TcMonad (p + n) (Refinement Term n)
-    go p tx ty = Scope.withScopeSize $ do
+    go p tx ty = Env.withScopeSize $ do
       (txnf :: Term (p + n)) <- whnf tx
       (tynf :: Term (p + n)) <- whnf ty
       if txnf == tynf
@@ -234,13 +232,13 @@ unify strict t1 t2 = do
           (TyCon s1 tms1, TyCon s2 tms2)
             | s1 == s2 -> goArgs p tms1 tms2
           (Lam bnd1, Lam bnd2) -> do
-            Scope.push1u
+            Env.pushUntyped
               (L.getLocalName bnd1)
               (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
           (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
             ds1 <- go p tyA1 tyA2
             ds2 <-
-              Scope.push1u
+              Env.pushUntyped
                 (L.getLocalName bnd1)
                 (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
             joinR ds1 ds2 `Env.whenNothing` [DS "cannot join refinements"]
@@ -293,25 +291,25 @@ patternMatchList (e1 : es) (PCons p1 ps) = do
     return (env2 .++ env1)
 patternMatchList _ _ = Env.err [DS "pattern match failure"]
 
-addRefinement :: forall t n a. (SNatI n, SubstVar t) => (Fin n, Term n) -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
+addRefinement :: forall n a. (SNatI n) => (Fin n, Term n) -> Refinement Term n -> TcMonad n (Refinement Term n)
 addRefinement (i, t) r = do
   let i' = refine r (var @Term i)
   let t' = refine r t
-  r' <- Env.mapScope (const Const) $ unify False i' t'
+  r' <- unify False i' t'
   joinR r r'
     `Env.whenNothing` [DS "BUG: cannot add refinement"]
 
-addRefinements :: forall t n a. (SNatI n, SubstVar t) => Refinement Term n -> Refinement Term n -> Env.TcMonad t n (Refinement Term n)
+addRefinements :: forall n a. (SNatI n) => Refinement Term n -> Refinement Term n -> TcMonad n (Refinement Term n)
 addRefinements r' r = do
   let e = fromRefinement r'
   foldM (\r i -> addRefinement (i, applyE e (var i)) r) r (domain r')
 
-pushRefinements :: forall t n a. (SNatI n, SubstVar t) => Refinement Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
+pushRefinements :: forall n a. (SNatI n) => Refinement Term n -> TcMonad n a -> TcMonad n a
 pushRefinements nr m = do
-  ctx <- Scope.flatData
-  ss <- Scope.scopeSize
+  ctx <- askS
+  ss <- Env.scopeSize
   r <- addRefinements nr (Env.refinement ctx)
-  local (\ctx -> ctx {Env.refinement = r}) m
+  localS (\ctx -> ctx {Env.refinement = r}) m
 
-pushRefinement :: (SNatI n, SubstVar t) => Fin n -> Term n -> Env.TcMonad t n a -> Env.TcMonad t n a
+pushRefinement :: (SNatI n) => Fin n -> Term n -> Env.TcMonad n a -> Env.TcMonad n a
 pushRefinement l r = pushRefinements (singletonR (l, r))
