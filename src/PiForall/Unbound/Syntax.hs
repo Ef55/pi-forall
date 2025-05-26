@@ -311,11 +311,6 @@ aeq = Unbound.aeq
 fv :: Term -> [Unbound.Name Term]
 fv = Unbound.toListOf Unbound.fv
 
--- | `subst x b a` means to replace `x` with `b` in `a`
--- i.e.  a [ b / x ]
-subst :: TName -> Term -> Term -> Term
-subst = Unbound.subst
-
 -- | in a binder `x.a` replace `x` with `b`
 instantiate :: Unbound.Bind TName Term -> Term -> Term
 instantiate bnd a = Unbound.substBind bnd a

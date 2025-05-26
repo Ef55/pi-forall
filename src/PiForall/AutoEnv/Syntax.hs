@@ -19,8 +19,9 @@ import AutoEnv.Bind.Pat qualified as Pat
 import AutoEnv.Bind.Scoped (TeleList (..), (<:>))
 import AutoEnv.Bind.Scoped qualified as Scoped
 import AutoEnv.Bind.Single qualified as B
-import AutoEnv.Scope qualified as DS
+import AutoEnv.MonadNamed (Named (..))
 import AutoEnv.MonadScoped
+import AutoEnv.Scope qualified as DS
 import Data.Fin
 import Data.Maybe qualified as Maybe
 import Data.Scoped.Const
@@ -205,10 +206,6 @@ instance Named LocalName (Pattern p) where
   names (PatVar x) = x ::: VNil
   names (PatCon _ p) = names p
 
-instance WithData k (Pattern p) LocalName Const where
-  getData (PatCon _ ps) = error ""-- getData ps
-  getData (PatVar x) = DS.singleton x Const
-
 -- scoped patterns
 
 instance Sized (Local p n) where
@@ -224,10 +221,6 @@ instance Scoped.IScopedSized Local
 instance Named LocalName (Local p n) where
   names (LocalDecl x _) = x ::: VNil
   names (LocalDef _ _) = VNil
-
-instance WithData k (Local p k) LocalName Typ where
-  getData (LocalDecl n t) = DS.singleton n t
-  getData (LocalDef _ _) = DS.empty
 
 ----------------------------------------------
 --  Subst instances
