@@ -89,7 +89,7 @@ data TcEnv (n :: Nat) = TcEnv
 --   type Size (NT n) = Nat.N1
 --   size _ = Nat.s1
 
-instance Scoped.Sized (TcEnv n) where
+instance Sized (TcEnv n) where
   type Size (TcEnv n) = n
   size = Vec.vlength . names
 
@@ -116,7 +116,7 @@ pushUntyped p = pushUntyped' (MonadNamed.names p)
   where
     pushUntyped' :: forall p n a. Vec.Vec p LocalName -> TcMonad (p + n) a -> TcMonad n a
     pushUntyped' Vec.VNil m = m
-    pushUntyped' (h Vec.::: t) m = pushUntyped' t $ push1 h TyType m
+    pushUntyped' (h Vec.::: t) m = pushUntyped' t $ push1 h (error "No type available") m
 
 type MonadScoped = Scoped.MonadScopedReader TcEnv
 
@@ -161,7 +161,7 @@ emptyEnv =
     }
 
 scopeSize :: TcMonad n (Nat.SNat n)
-scopeSize = readerS (Scoped.size :: TcEnv n -> Nat.SNat n)
+scopeSize = readerS (size :: TcEnv n -> Nat.SNat n)
 
 withScopeSize :: ((Nat.SNatI n) => TcMonad n u) -> TcMonad n u
 withScopeSize k = do
@@ -175,9 +175,6 @@ refine :: Term n -> TcMonad n (Term n)
 refine t = do
   r <- getRefinement
   withScopeSize $ return $ Rebound.refine r t
-
--- pushUntyped :: Vec p LocalName -> TcMonad Const (p + n) a -> TcMonad Const n a
--- pushUntyped n = Scoped.push (Named n Const)
 
 --------------------------------------------------------------------
 -- Globals

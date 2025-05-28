@@ -11,7 +11,6 @@ import Rebound.Bind.Scoped qualified as Scoped
 import Rebound.Bind.Single qualified as B
 import Rebound.Context
 import Rebound.Context qualified as Context
-import Rebound.Scope qualified as Scope
 import Rebound.MonadScoped qualified as Scope
 import Rebound.Lib
 import Control.Monad

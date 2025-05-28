@@ -21,7 +21,6 @@ import Rebound.Bind.Scoped qualified as Scoped
 import Rebound.Bind.Single qualified as B
 import Rebound.MonadNamed (Named (..))
 import Rebound.MonadScoped
-import Rebound.Scope qualified as DS
 import Data.Fin
 import Data.Maybe qualified as Maybe
 import Data.Scoped.Const
