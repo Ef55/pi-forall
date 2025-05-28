@@ -6,7 +6,7 @@
 -- Stability   : experimental
 --
 -- This module demonstrates a translation from unscoped to well-scoped terms
-module PiForall.AutoEnv.ScopeCheck
+module PiForall.Rebound.ScopeCheck
   ( Some1 (..),
     Scoping (..),
     scopeUnder,
@@ -17,17 +17,17 @@ module PiForall.AutoEnv.ScopeCheck
   )
 where
 
-import AutoEnv qualified
-import AutoEnv.Bind.Local qualified as L
-import AutoEnv.Bind.Pat (PatList (..))
-import AutoEnv.Bind.Pat qualified as Pat
-import AutoEnv.Bind.Scoped ((<:>))
-import AutoEnv.Bind.Scoped qualified as Scoped
-import AutoEnv.Bind.Single qualified as B
-import AutoEnv.Scope qualified as DS
-import AutoEnv.Lib
-import AutoEnv.MonadNamed (ScopedReader)
-import AutoEnv.MonadNamed qualified as Scoped
+import Rebound qualified
+import Rebound.Bind.Local qualified as L
+import Rebound.Bind.Pat (PatList (..))
+import Rebound.Bind.Pat qualified as Pat
+import Rebound.Bind.Scoped ((<:>))
+import Rebound.Bind.Scoped qualified as Scoped
+import Rebound.Bind.Single qualified as B
+import Rebound.Scope qualified as DS
+import Rebound.Lib
+import Rebound.MonadNamed (ScopedReader)
+import Rebound.MonadNamed qualified as Scoped
 import Control.Monad (foldM)
 import Control.Monad qualified as Monad
 import Control.Monad.Reader (MonadReader (ask), Reader, asks, runReader)
@@ -36,7 +36,7 @@ import Data.Fin qualified as Nat
 import Data.Maybe (fromJust)
 import Data.Maybe qualified as Maybe
 import Data.Vec qualified as Vec
-import PiForall.AutoEnv.Syntax qualified as S
+import PiForall.Rebound.Syntax qualified as S
 import PiForall.ConcreteSyntax qualified as C
 import Prelude hiding (lookup)
 
@@ -312,18 +312,18 @@ instance Scoping Z C.Module S.Module where
           C.moduleConstructors = S.moduleConstructors m
         }
 
-instance Scoping n (Vec n C.Term) (SNat n, AutoEnv.Env S.Term n n) where
+instance Scoping n (Vec n C.Term) (SNat n, Rebound.Env S.Term n n) where
   scope' v = Vec.withDict v $ do
     iv <- mapM scope' v
-    let env = AutoEnv.fromTable $ Vec.toList $ Vec.imap (,) iv
+    let env = Rebound.fromTable $ Vec.toList $ Vec.imap (,) iv
     return (snat, env)
 
   unscope' (n, env) = do
     let u :: Vec n (Fin n) = withSNat n Vec.universe
-        ts :: Vec n (S.Term n) = AutoEnv.applyE env . S.Var <$> u
+        ts :: Vec n (S.Term n) = Rebound.applyE env . S.Var <$> u
     mapM unscope' ts
 
-instance Scoping Z (Vec n (LocalName, C.Term)) (SNat n, Vec n LocalName, AutoEnv.Env S.Term n n) where
+instance Scoping Z (Vec n (LocalName, C.Term)) (SNat n, Vec n LocalName, Rebound.Env S.Term n n) where
   -- scope' Vec.VNil = return (SZ, DS.empty)
   -- scope' ((hx, ht) Vec.::: t) = do
   --   ht' :: S.Term n <- scope' ht

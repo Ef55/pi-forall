@@ -1,24 +1,24 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module PiForall.AutoEnv.Equal where
+module PiForall.Rebound.Equal where
 
-import AutoEnv
-import AutoEnv.Bind.Local as L
-import AutoEnv.Bind.Pat as Pat
-import AutoEnv.Bind.Scoped as Scoped
-import AutoEnv.MonadScoped
-import AutoEnv.MonadScoped qualified as Scope
--- import AutoEnv.Env as Env
+import Rebound
+import Rebound.Bind.Local as L
+import Rebound.Bind.Pat as Pat
+import Rebound.Bind.Scoped as Scoped
+import Rebound.MonadScoped
+import Rebound.MonadScoped qualified as Scope
+-- import Rebound.Env as Env
 import Control.Monad (foldM, unless, zipWithM, zipWithM_)
 import Control.Monad.Except (ExceptT, MonadError, catchError)
 import Control.Monad.Reader (MonadReader, ReaderT)
 import Control.Monad.Writer (MonadWriter, Writer)
 import Data.SNat qualified as SNat
 import Data.Scoped.Const
-import PiForall.AutoEnv.Environment (TcMonad, Context, D (..))
-import PiForall.AutoEnv.Environment qualified as Env
-import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
-import PiForall.AutoEnv.Syntax
+import PiForall.Rebound.Environment (TcMonad, Context, D (..))
+import PiForall.Rebound.Environment qualified as Env
+import PiForall.Rebound.ScopeCheck qualified as ScopeCheck
+import PiForall.Rebound.Syntax
 import PiForall.Log (Log)
 import PiForall.PrettyPrint
 import Prettyprinter as PP

@@ -1,17 +1,17 @@
 {- pi-forall language -}
 
 -- | Tools for working with multiple source files
-module PiForall.AutoEnv.Modules (goFilename, getModules, ModuleInfo (..)) where
+module PiForall.Rebound.Modules (goFilename, getModules, ModuleInfo (..)) where
 
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.Graph qualified as Gr
 import Data.List (nub, (\\))
-import PiForall.AutoEnv.Environment
-import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
-import PiForall.AutoEnv.Syntax
-import PiForall.AutoEnv.TypeCheck
+import PiForall.Rebound.Environment
+import PiForall.Rebound.ScopeCheck qualified as ScopeCheck
+import PiForall.Rebound.Syntax
+import PiForall.Rebound.TypeCheck
 import PiForall.ConcreteSyntax qualified as C
 import PiForall.Parser
 import PiForall.PrettyPrint

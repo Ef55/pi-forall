@@ -1,7 +1,7 @@
 module ParseScopeRT where
 
 import Test.QuickCheck qualified as QC
-import PiForall.AutoEnv.ScopeCheck
+import PiForall.Rebound.ScopeCheck
 import PiForall.ConcreteSyntax
 import PiForall.Parser (expr, testParser)
 
