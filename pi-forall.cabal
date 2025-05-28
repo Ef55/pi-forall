@@ -23,7 +23,7 @@ common common-stanza
      -fwarn-incomplete-patterns
   build-depends:
       base >=4.15
-    , autoenv
+    , rebound
     , QuickCheck
     , containers
     , filepath
@@ -60,12 +60,12 @@ library
       , PiForall.Log
       , PiForall.ConcreteSyntax
       , PiForall.Arbitrary
-      , PiForall.AutoEnv.Syntax
-      , PiForall.AutoEnv.Environment
-      , PiForall.AutoEnv.Equal
-      , PiForall.AutoEnv.ScopeCheck
-      , PiForall.AutoEnv.Modules
-      , PiForall.AutoEnv.TypeCheck
+      , PiForall.Rebound.Syntax
+      , PiForall.Rebound.Environment
+      , PiForall.Rebound.Equal
+      , PiForall.Rebound.ScopeCheck
+      , PiForall.Rebound.Modules
+      , PiForall.Rebound.TypeCheck
       , PiForall.Unbound.Syntax
       , PiForall.Unbound.Environment
       , PiForall.Unbound.Equal

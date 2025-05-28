@@ -2,8 +2,8 @@
 -- This version distinguishes between global and local names
 -- Global names are strings (which must be unique). Local names
 -- are represented by indices.
-module PiForall.AutoEnv.Syntax
-  ( module PiForall.AutoEnv.Syntax,
+module PiForall.Rebound.Syntax
+  ( module PiForall.Rebound.Syntax,
     GlobalName,
     ConstructorNames (..),
     TyConName (..),
@@ -13,15 +13,15 @@ module PiForall.AutoEnv.Syntax
   )
 where
 
-import AutoEnv
-import AutoEnv.Bind.Local qualified as Local
-import AutoEnv.Bind.Pat qualified as Pat
-import AutoEnv.Bind.Scoped (TeleList (..), (<:>))
-import AutoEnv.Bind.Scoped qualified as Scoped
-import AutoEnv.Bind.Single qualified as B
-import AutoEnv.MonadNamed (Named (..))
-import AutoEnv.MonadScoped
-import AutoEnv.Scope qualified as DS
+import Rebound
+import Rebound.Bind.Local qualified as Local
+import Rebound.Bind.Pat qualified as Pat
+import Rebound.Bind.Scoped (TeleList (..), (<:>))
+import Rebound.Bind.Scoped qualified as Scoped
+import Rebound.Bind.Single qualified as B
+import Rebound.MonadNamed (Named (..))
+import Rebound.MonadScoped
+import Rebound.Scope qualified as DS
 import Data.Fin
 import Data.Maybe qualified as Maybe
 import Data.Scoped.Const

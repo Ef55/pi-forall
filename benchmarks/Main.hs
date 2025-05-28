@@ -1,5 +1,5 @@
 import Criterion.Main
-import PiForall.AutoEnv.Modules qualified as AutoPiForall
+import PiForall.Rebound.Modules qualified as AutoPiForall
 import PiForall.Unbound.Modules qualified as UnPiForall
 
 -- TODO: suppress IO
@@ -10,7 +10,7 @@ b name path =
   bgroup
     name
     [ bench "Unbound" $ nfIO (UnPiForall.goFilename prefixes path),
-      bench "AutoEnv" $ nfIO (AutoPiForall.goFilename prefixes path)
+      bench "Rebound" $ nfIO (AutoPiForall.goFilename prefixes path)
     ]
 
 main =

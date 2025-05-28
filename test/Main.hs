@@ -7,11 +7,11 @@ import Data.List (intercalate)
 import Data.Maybe (isJust)
 import ParseResolveRT as UnRT
 import ParseScopeRT as AutoPiForall
-import PiForall.AutoEnv.Environment qualified as AutoPiForall
-import PiForall.AutoEnv.Equal qualified as AutoPiForall
-import PiForall.AutoEnv.Modules qualified as AutoPiForall
-import PiForall.AutoEnv.Syntax qualified as AutoPiForall
-import PiForall.AutoEnv.TypeCheck qualified as AutoPiForall
+import PiForall.Rebound.Environment qualified as AutoPiForall
+import PiForall.Rebound.Equal qualified as AutoPiForall
+import PiForall.Rebound.Modules qualified as AutoPiForall
+import PiForall.Rebound.Syntax qualified as AutoPiForall
+import PiForall.Rebound.TypeCheck qualified as AutoPiForall
 import PiForall.Unbound.Environment qualified as UnPiForall
 import PiForall.Unbound.Equal qualified as UnPiForall
 import PiForall.Unbound.Modules qualified as UnPiForall
@@ -79,7 +79,7 @@ bugs tcFile =
     "Bugs"
     ( positiveTests
         "test/reproducers"
-        [ -- https://github.com/sweirich/autoenv/pull/2
+        [ -- https://github.com/sweirich/Rebound/pull/2
           "Bug1",
           "Bug2"
         ]
@@ -100,7 +100,7 @@ main = do
             examples unTcFile
           ],
         testGroup
-          "Autoenv"
+          "Rebound"
           [ QC.testProperty "PP-Parsing round trip" AutoPiForall.prop_roundtrip,
             std autoTcFile,
             examples autoTcFile,

@@ -1,6 +1,6 @@
-module PiForall.AutoEnv.Environment where
+module PiForall.Rebound.Environment where
 
-import AutoEnv
+import Rebound
   ( Ctx,
     Fin,
     LocalName,
@@ -19,19 +19,19 @@ import AutoEnv
     (+++),
     type (+),
   )
-import AutoEnv qualified
-import AutoEnv.Bind.Local qualified as Local
-import AutoEnv.Bind.Pat qualified as Pat
--- import AutoEnv.Scope qualified as Scope
+import Rebound qualified
+import Rebound.Bind.Local qualified as Local
+import Rebound.Bind.Pat qualified as Pat
+-- import Rebound.Scope qualified as Scope
 
--- import AutoEnv.MonadScoped qualified as SimpleScope
+-- import Rebound.MonadScoped qualified as SimpleScope
 
-import AutoEnv.Bind.Scoped qualified as Scoped
-import AutoEnv.Env (Shiftable, fromRefinement)
-import AutoEnv.MonadNamed (Named, Sized (..))
-import AutoEnv.MonadNamed qualified as MonadNamed
-import AutoEnv.MonadScoped (MonadScopedReader (..))
-import AutoEnv.MonadScoped qualified as Scoped
+import Rebound.Bind.Scoped qualified as Scoped
+import Rebound.Env (Shiftable, fromRefinement)
+import Rebound.MonadNamed (Named, Sized (..))
+import Rebound.MonadNamed qualified as MonadNamed
+import Rebound.MonadScoped (MonadScopedReader (..))
+import Rebound.MonadScoped qualified as Scoped
 import Control.Monad.Except
   ( ExceptT,
     MonadError (..),
@@ -54,8 +54,8 @@ import Data.Maybe (listToMaybe)
 import Data.SNat qualified as Nat
 import Data.Scoped.Const
 import Data.Vec qualified as Vec
-import PiForall.AutoEnv.ScopeCheck qualified as ScopeCheck
-import PiForall.AutoEnv.Syntax
+import PiForall.Rebound.ScopeCheck qualified as ScopeCheck
+import PiForall.Rebound.Syntax
 import PiForall.Log
 import PiForall.PrettyPrint
 import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
@@ -156,7 +156,7 @@ emptyEnv =
       hints = [],
       sourceLocation = [],
       names = Vec.empty,
-      types = AutoEnv.zeroE,
+      types = Rebound.zeroE,
       refinement = emptyR
     }
 
@@ -174,7 +174,7 @@ getRefinement = readerS refinement
 refine :: Term n -> TcMonad n (Term n)
 refine t = do
   r <- getRefinement
-  withScopeSize $ return $ AutoEnv.refine r t
+  withScopeSize $ return $ Rebound.refine r t
 
 -- pushUntyped :: Vec p LocalName -> TcMonad Const (p + n) a -> TcMonad Const n a
 -- pushUntyped n = Scoped.push (Named n Const)

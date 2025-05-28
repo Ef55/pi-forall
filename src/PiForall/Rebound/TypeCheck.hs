@@ -1,19 +1,19 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module PiForall.AutoEnv.TypeCheck (tcModules, inferType, checkType) where
+module PiForall.Rebound.TypeCheck (tcModules, inferType, checkType) where
 
-import AutoEnv
-import AutoEnv.Bind.Local qualified as Local
-import AutoEnv.Bind.Pat (PatList (..))
-import AutoEnv.Bind.Pat qualified as Pat
-import AutoEnv.Bind.Scoped (TeleList (..), (<:>), (<++>))
-import AutoEnv.Bind.Scoped qualified as Scoped
-import AutoEnv.Bind.Single qualified as B
-import AutoEnv.Context
-import AutoEnv.Context qualified as Context
-import AutoEnv.Scope qualified as Scope
-import AutoEnv.MonadScoped qualified as Scope
-import AutoEnv.Lib
+import Rebound
+import Rebound.Bind.Local qualified as Local
+import Rebound.Bind.Pat (PatList (..))
+import Rebound.Bind.Pat qualified as Pat
+import Rebound.Bind.Scoped (TeleList (..), (<:>), (<++>))
+import Rebound.Bind.Scoped qualified as Scoped
+import Rebound.Bind.Single qualified as B
+import Rebound.Context
+import Rebound.Context qualified as Context
+import Rebound.Scope qualified as Scope
+import Rebound.MonadScoped qualified as Scope
+import Rebound.Lib
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Writer (tell)
@@ -28,11 +28,11 @@ import Data.SNat qualified as SNat
 import Data.Scoped.Const
 import Data.Vec qualified as Vec
 import PiForall.Log qualified as Log
-import PiForall.AutoEnv.Environment (Context, D (..), TcMonad)
-import PiForall.AutoEnv.Environment qualified as Env
-import PiForall.AutoEnv.Equal qualified as Equal
-import PiForall.AutoEnv.ScopeCheck (Some1 (..))
-import PiForall.AutoEnv.Syntax
+import PiForall.Rebound.Environment (Context, D (..), TcMonad)
+import PiForall.Rebound.Environment qualified as Env
+import PiForall.Rebound.Equal qualified as Equal
+import PiForall.Rebound.ScopeCheck (Some1 (..))
+import PiForall.Rebound.Syntax
 import PiForall.PrettyPrint (Display (..), disp, pp)
 import Prettyprinter (pretty)
 import Unsafe.Coerce qualified
