@@ -2,17 +2,6 @@
 
 module PiForall.Rebound.TypeCheck (tcModules, inferType, checkType) where
 
-import Rebound
-import Rebound.Bind.Local qualified as Local
-import Rebound.Bind.Pat (PatList (..))
-import Rebound.Bind.Pat qualified as Pat
-import Rebound.Bind.Scoped (TeleList (..), (<:>), (<++>))
-import Rebound.Bind.Scoped qualified as Scoped
-import Rebound.Bind.Single qualified as B
-import Rebound.Context
-import Rebound.Context qualified as Context
-import Rebound.MonadScoped qualified as Scope
-import Rebound.Lib
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Writer (tell)
@@ -24,16 +13,26 @@ import Data.Map qualified as Map
 import Data.Maybe (catMaybes)
 import Data.Proxy (Proxy (..))
 import Data.SNat qualified as SNat
-import Data.Scoped.Const
 import Data.Vec qualified as Vec
 import PiForall.Log qualified as Log
+import PiForall.PrettyPrint (Display (..), disp, pp)
 import PiForall.Rebound.Environment (Context, D (..), TcMonad)
 import PiForall.Rebound.Environment qualified as Env
 import PiForall.Rebound.Equal qualified as Equal
 import PiForall.Rebound.ScopeCheck (Some1 (..))
 import PiForall.Rebound.Syntax
-import PiForall.PrettyPrint (Display (..), disp, pp)
 import Prettyprinter (pretty)
+import Rebound
+import Rebound.Bind.Local qualified as Local
+import Rebound.Bind.Pat (PatList (..))
+import Rebound.Bind.Pat qualified as Pat
+import Rebound.Bind.Scoped (TeleList (..), (<++>), (<:>))
+import Rebound.Bind.Scoped qualified as Scoped
+import Rebound.Bind.Single qualified as B
+import Rebound.Context
+import Rebound.Context qualified as Context
+import Rebound.Lib
+import Rebound.MonadScoped qualified as Scope
 import Unsafe.Coerce qualified
 
 ---------------------------------------------------------------------
@@ -163,7 +162,6 @@ checkType tm ty = do
           DS "\nGoal:",
           DU ty'
         ]
-
     (Let a bnd) -> do
       let (x, b) = Local.unbindl bnd
       tyA <- inferType a
@@ -405,7 +403,7 @@ doSubstRec strict k r (TCons e (t :: Telescope p2 m)) = case e of
   LocalDecl nm (ty :: Term ((k + q) + n)) -> do
     let ty' :: Term (k + n)
         ty' = applyE r ty
-    t' <- Env.push1 nm ty' $ doSubstRec @q @n strict (SNat.succ k) (up r) t
+    t' <- Env.push1 nm ty' $ doSubstRec @q @n strict (SNat.next k) (up r) t
     return $ LocalDecl nm ty' <:> t'
 
 appendDefs :: Refinement Term n -> Telescope p n -> Telescope p n

@@ -1,5 +1,36 @@
 module PiForall.Rebound.Environment where
 
+-- import Rebound.Scope qualified as Scope
+
+-- import Rebound.MonadScoped qualified as SimpleScope
+
+import Control.Monad.Except
+  ( ExceptT,
+    MonadError (..),
+    runExceptT,
+  )
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+  ( MonadReader (local),
+    ReaderT (..),
+    ask,
+    asks,
+  )
+import Control.Monad.Writer (MonadWriter (..), Writer, runWriter)
+import Data.Fin qualified as Fin
+import Data.Foldable (Foldable (..), toList)
+import Data.Kind (Type)
+import Data.List
+import Data.List qualified as List
+import Data.Maybe (listToMaybe)
+import Data.SNat qualified as Nat
+import Data.Vec qualified as Vec
+import PiForall.Log
+import PiForall.PrettyPrint
+import PiForall.Rebound.ScopeCheck qualified as ScopeCheck
+import PiForall.Rebound.Syntax
+import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
+import Prettyprinter qualified as PP
 import Rebound
   ( Ctx,
     Fin,
@@ -22,44 +53,12 @@ import Rebound
 import Rebound qualified
 import Rebound.Bind.Local qualified as Local
 import Rebound.Bind.Pat qualified as Pat
--- import Rebound.Scope qualified as Scope
-
--- import Rebound.MonadScoped qualified as SimpleScope
-
 import Rebound.Bind.Scoped qualified as Scoped
 import Rebound.Env (Shiftable, fromRefinement)
 import Rebound.MonadNamed (Named, Sized (..))
 import Rebound.MonadNamed qualified as MonadNamed
 import Rebound.MonadScoped (MonadScopedReader (..))
 import Rebound.MonadScoped qualified as Scoped
-import Control.Monad.Except
-  ( ExceptT,
-    MonadError (..),
-    runExceptT,
-  )
-import Control.Monad.IO.Class
-import Control.Monad.Reader
-  ( MonadReader (local),
-    ReaderT (..),
-    ask,
-    asks,
-  )
-import Control.Monad.Writer (MonadWriter (..), Writer, runWriter)
-import Data.Fin qualified as Fin
-import Data.Foldable (Foldable (..), toList)
-import Data.Kind (Type)
-import Data.List
-import Data.List qualified as List
-import Data.Maybe (listToMaybe)
-import Data.SNat qualified as Nat
-import Data.Scoped.Const
-import Data.Vec qualified as Vec
-import PiForall.Rebound.ScopeCheck qualified as ScopeCheck
-import PiForall.Rebound.Syntax
-import PiForall.Log
-import PiForall.PrettyPrint
-import Prettyprinter (Doc, nest, pretty, sep, vcat, (<+>))
-import Prettyprinter qualified as PP
 import Text.ParserCombinators.Parsec.Pos (SourcePos)
 
 -------------------------------------------------------

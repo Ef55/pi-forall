@@ -1,9 +1,10 @@
--- Certified Programming with Dependent Types: A Pragmatic Introduction to the Coq Proof Assistant
--- By: Adam Chlipala
--- https://doi.org/10.7551/mitpress/9153.001.0001
--- ISBN (electronic): 9780262317870
--- Publisher: The MIT Press
--- Published: 2013
+-- Inspired from
+--- Certified Programming with Dependent Types: A Pragmatic Introduction to the Coq Proof Assistant
+--- By: Adam Chlipala
+--- https://doi.org/10.7551/mitpress/9153.001.0001
+--- ISBN (electronic): 9780262317870
+--- Publisher: The MIT Press
+--- Published: 2013
 
 module Compiler where
 

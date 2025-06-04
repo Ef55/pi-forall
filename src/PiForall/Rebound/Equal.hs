@@ -2,26 +2,25 @@
 
 module PiForall.Rebound.Equal where
 
-import Rebound
-import Rebound.Bind.Local as L
-import Rebound.Bind.Pat as Pat
-import Rebound.Bind.Scoped as Scoped
-import Rebound.MonadScoped
-import Rebound.MonadScoped qualified as Scope
 -- import Rebound.Env as Env
 import Control.Monad (foldM, unless, zipWithM, zipWithM_)
 import Control.Monad.Except (ExceptT, MonadError, catchError)
 import Control.Monad.Reader (MonadReader, ReaderT)
 import Control.Monad.Writer (MonadWriter, Writer)
 import Data.SNat qualified as SNat
-import Data.Scoped.Const
-import PiForall.Rebound.Environment (TcMonad, Context, D (..))
+import PiForall.Log (Log)
+import PiForall.PrettyPrint
+import PiForall.Rebound.Environment (Context, D (..), TcMonad)
 import PiForall.Rebound.Environment qualified as Env
 import PiForall.Rebound.ScopeCheck qualified as ScopeCheck
 import PiForall.Rebound.Syntax
-import PiForall.Log (Log)
-import PiForall.PrettyPrint
 import Prettyprinter as PP
+import Rebound
+import Rebound.Bind.Local as L
+import Rebound.Bind.Pat as Pat
+import Rebound.Bind.Scoped as Scoped
+import Rebound.MonadScoped
+import Rebound.MonadScoped qualified as Scope
 
 -- | compare two expressions for equality
 -- first check if they are alpha equivalent then
@@ -234,13 +233,13 @@ unify strict t1 t2 = do
           (Lam bnd1, Lam bnd2) -> do
             Env.pushUntyped
               (L.getLocalName bnd1)
-              (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
+              (go @n (SNat.next p) (L.getBody bnd1) (L.getBody bnd2))
           (Pi tyA1 bnd1, Pi tyA2 bnd2) -> do
             ds1 <- go p tyA1 tyA2
             ds2 <-
               Env.pushUntyped
                 (L.getLocalName bnd1)
-                (go @n (SNat.succ p) (L.getBody bnd1) (L.getBody bnd2))
+                (go @n (SNat.next p) (L.getBody bnd1) (L.getBody bnd2))
             joinR ds1 ds2 `Env.whenNothing` [DS "cannot join refinements"]
           (TyEq a1 b1, TyEq a2 b2) -> do
             ds1 <- go p a1 a2

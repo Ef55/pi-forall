@@ -23,12 +23,12 @@ import Rebound.MonadNamed (Named (..))
 import Rebound.MonadScoped
 import Data.Fin
 import Data.Maybe qualified as Maybe
-import Data.Scoped.Const
 import Data.Set qualified as Set
 import Data.Vec qualified as Vec
 import PiForall.ConcreteSyntax (ConstructorNames (..), DataConName, GlobalName, ModuleImport (..), ModuleName, TyConName)
 import Text.ParserCombinators.Parsec.Pos (SourcePos, newPos)
 import Unsafe.Coerce (unsafeCoerce)
+import Data.Foldable (fold)
 
 -- | types and terms (combined syntax)
 type Typ = Term
@@ -290,31 +290,35 @@ t01 = App (Var f0) (Var f1)
 -- False
 
 instance FV Term where
-  appearsFree n TyType = False
-  appearsFree n (Var x) = n == x
-  appearsFree n (Global _) = False
-  appearsFree n (Pi a b) = appearsFree n a || appearsFree n b
-  appearsFree n (Lam b) = appearsFree n b
-  appearsFree n (App a b) = appearsFree n a || appearsFree n b
-  appearsFree n (TyCon _ args) = any (appearsFree n) args
-  appearsFree n (DataCon _ args) = any (appearsFree n) args
-  appearsFree n (Case t b) = appearsFree n t || any (appearsFree n) b
-  appearsFree n (Ann a t) = appearsFree n a || appearsFree n t
-  appearsFree n (Pos _ a) = appearsFree n a
-  appearsFree n (Let a b) = appearsFree n a || appearsFree n b
-  appearsFree n (TyEq a b) = appearsFree n a || appearsFree n b
-  appearsFree n TmRefl = False
-  appearsFree n (Subst a b) = appearsFree n a || appearsFree n b
-  appearsFree n (Contra a) = appearsFree n a
-  appearsFree n TrustMe = False
-  appearsFree n PrintMe = False
+  freeVars TyType = Set.empty
+  freeVars (Var x) = Set.singleton x
+  freeVars (Global _) = Set.empty
+  freeVars (Pi a b) = freeVars a `Set.union` freeVars b
+  freeVars (Lam b) = freeVars b
+  freeVars (App a b) = freeVars a `Set.union` freeVars b
+  freeVars (TyCon _ args) = foldMap freeVars args
+  freeVars (DataCon _ args) = foldMap freeVars args
+  freeVars (Case t b) = freeVars t `Set.union` foldMap freeVars b
+  freeVars (Ann a t) = freeVars a `Set.union` freeVars t
+  freeVars (Pos _ a) = freeVars a
+  freeVars (Let a b) = freeVars a `Set.union` freeVars b
+  freeVars (TyEq a b) = freeVars a `Set.union` freeVars b
+  freeVars TmRefl = Set.empty
+  freeVars (Subst a b) = freeVars a `Set.union` freeVars b
+  freeVars (Contra a) = freeVars a
+  freeVars TrustMe = Set.empty
+  freeVars PrintMe = Set.empty
+
+  appearsFree n t = n `Set.member` freeVars t
 
 instance FV Match where
-  appearsFree n (Branch bnd) = appearsFree n bnd
+  freeVars (Branch bnd) = freeVars bnd
+  appearsFree n t = n `Set.member` freeVars t
 
 instance FV (Local p) where
-  appearsFree n (LocalDecl x y) = appearsFree n y
-  appearsFree n (LocalDef x y) = n == x || appearsFree n y
+  freeVars (LocalDecl x y) = freeVars y
+  freeVars (LocalDef x y) = x `Set.insert` freeVars y
+  appearsFree n t = n `Set.member` freeVars t
 
 ----------------------------------------------
 -- weakening (convenience functions)

@@ -3,7 +3,9 @@ allow-newer: true
 packages:
 - .
 extra-deps:
-- github: Ef55/autoenv
-  commit: efa2a12177e0f16c9bf09806cc6e056f65a2a5fe
+- github: sweirich/rebound
+  commit: f14a1a37616373afd1262d0f76c7ee2180aeb7c0
+  subdirs:
+  - rebound
 - unbound-generics-0.4.4@sha256:f7fc93641d5043db8938a5e77f463afa7c473edca3ef26097d4b6f98d45e255c,5521
 notify-if-nix-on-path: false
