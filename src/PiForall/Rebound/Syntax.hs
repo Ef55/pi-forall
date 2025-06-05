@@ -149,47 +149,6 @@ unPosFlaky :: Term n -> SourcePos
 unPosFlaky t = Maybe.fromMaybe (newPos "unknown location" 0 0) (unPos t)
 
 ----------------------------------------------
--- TODO: move to Pat.Simple
-
-{-
-class (Sized (pat p), Size (pat p) ~ p) => PatSize pat p
-instance (Sized (pat p), Size (pat p) ~ p) => PatSize pat p
-
--- | lists of patterns where variables at each position bind
--- later in the pattern
-data PatList (pat :: Nat -> Type) p where
-  PNil :: PatList pat N0
-  PCons :: Size (pat p1) ~ p1 =>
-    pat p1 -> PatList pat p2 -> PatList pat (Plus p2 p1)
-
-instance (forall n. Sized (pat n)) => Sized (PatList pat p) where
-    type Size (PatList pat p) = p
-    size PNil = s0
-    size (PCons (p1 :: pat p1) (p2 :: PatList pat p2)) =
-        sPlus @p2 @(Size (pat p1)) (size p2) (size p1)
-
-instance (forall p. Named (pat p)) => Named (PatList pat p) where
-  patLocals :: PatList pat p -> Vec p LocalName
-  patLocals PNil = VNil
-  patLocals (PCons (p1 :: pat p1) (ps :: PatList pat ps)) =
-    let test :: Size (pat p1) :~: p1
-        test = Refl
-    in
-      Vec.append @ps @(Size (pat p1)) (patLocals ps) (patLocals p1)
-
-instance (forall p1 p2. PatEq (pat p1) (pat p2)) =>
-      PatEq (PatList pat p1) (PatList pat p2) where
-  patEq :: PatList pat p1 -> PatList pat p2 -> Maybe (p1 :~: p2)
-  patEq PNil PNil = Just Refl
-  patEq (PCons p1 ps1) (PCons p2 ps2) = do
-    Refl <- patEq p1 p2
-    Refl <- patEq ps1 ps2
-    return Refl
-  patEq _ _ = Nothing
--}
-------------------------------------------------------
-
-----------------------------------------------
 --  Sized/Named instances
 ----------------------------------------------
 
@@ -438,28 +397,6 @@ instance (Eq (Term n)) => Eq (Local.Bind Term Term n) where
 -------------------------------------------------------
 -- Prelude datatypes
 -------------------------------------------------------
-
-{-
-eqDef :: DataDef
-eqDef =
-  DataDef
-  {
-    data_delta =
-        LocalDecl (LocalName "A")  TyType <:>  -- "A"
-        LocalDecl (LocalName "a1") (Var f0) <:>
-        LocalDecl (LocalName "a2") (Var f1) <:> TNil,  -- "B"
-    data_sort = TyType,
-    data_constructors = [reflCon]
-  }
-
-reflCon :: ConstructorDef N3
-reflCon =
-  ConstructorDef
-  { con_name = "Refl",
-    con_theta =
-      LocalDef f0 (Var f1) <:> TNil -- "a1 = a2"
-  }
-  -}
 
 sigmaDef :: DataDef
 sigmaDef =

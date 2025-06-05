@@ -54,7 +54,7 @@ scopeTelescope :: forall n. C.Telescope -> Scope n (Some2 S.Telescope n)
 scopeTelescope (C.Telescope t) = iter t
   where
     iter :: forall n. [C.Entry] -> Scope n (Some2 S.Telescope n)
-    iter [] = pure $ Some2 Scoped.TNil
+    iter [] = pure $ Some2 Scoped.nil
     iter (C.EntryDecl n ty : entries) = do
       ty' <- scope' ty
       Scoped.push n $ do

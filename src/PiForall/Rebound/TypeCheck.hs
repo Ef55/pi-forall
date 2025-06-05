@@ -389,7 +389,7 @@ doSubst strict = doSubstRec @q @n strict s0
 
 -- we need to generalize the recursion so that we can increase the scope as we traverse the telescope
 doSubstRec :: forall q n k p. Bool -> SNat k -> Env Term ((k + q) + n) (k + n) -> Telescope p ((k + q) + n) -> TcMonad (k + n) (Telescope p (k + n))
-doSubstRec _ k r TNil = return TNil
+doSubstRec _ k r TNil = return Scoped.nil
 doSubstRec strict k r (TCons e (t :: Telescope p2 m)) = case e of
   LocalDef x (tm :: Term ((k + q) + n)) -> case axiomPlusZ @p2 of
     Refl -> do
@@ -397,7 +397,7 @@ doSubstRec strict k r (TCons e (t :: Telescope p2 m)) = case e of
           tx' = applyE r (Var x)
       let tm' :: Term (k + n)
           tm' = applyE r tm
-      defs <- Equal.unify strict tx' tm'
+      defs :: Refinement Term (k + n) <- Equal.unify strict tx' tm'
       (tele' :: Telescope p2 (k + n)) <- doSubstRec @q @n strict k r t
       return $ appendDefs defs tele'
   LocalDecl nm (ty :: Term ((k + q) + n)) -> do
@@ -411,9 +411,7 @@ appendDefs (Refinement m) = go (Map.toList m)
   where
     go :: forall n p. [(Fin n, Term n)] -> Telescope p n -> Telescope p n
     go [] t = t
-    go ((x, tm) : defs) (t :: Telescope p1 n) =
-      case axiomPlusZ @p1 of
-        Refl -> LocalDef x tm <:> (go defs t)
+    go ((x, tm) : defs) (t :: Telescope p1 n) = case axiomPlusZ @p1 of Refl -> LocalDef x tm <:> (go defs t)
 
 -- | Create a binding for each of the variables in the pattern, producing an extended context and
 -- a term corresponding to the variables
@@ -423,20 +421,16 @@ declarePat ::
   Typ n ->
   TcMonad n (Telescope p n, Term (p + n), Refinement Term (p + n))
 declarePat (PatVar x) ty = do
-  pure (LocalDecl x ty <:> TNil, Var Fin.f0, emptyR)
+  pure (LocalDecl x ty <:> Scoped.nil, Var Fin.f0, emptyR)
 declarePat p@(PatCon dc (pats :: PatList Pattern p)) ty = do
   (tc, params) <- Equal.ensureTCon ty
   ScopedConstructorDef (delta :: Telescope p1 'Z) (ConstructorDef cn (thetai :: Telescope p2 p1)) <- Env.lookupDCon dc tc
-  case axiomPlusZ @n of
-    Refl ->
-      if Pat.lengthPL pats == toInt (Scoped.scopedSize thetai)
-        then do
-          -- case testEquality (size pats) (Scoped.scopedSize thetai) of
-          --   Just Refl -> do
-          (tele :: Telescope p2 n) <- substTele False delta params thetai
-          (defs, tms', r) <- declarePats pats tele
-          pure (defs, DataCon dc tms', r)
-        else Env.err [DS "Wrong number of arguments to data constructor", DC cn]
+  if Pat.lengthPL pats == toInt (Scoped.scopedSize thetai)
+    then do
+      (tele :: Telescope p2 n) <- substTele False delta params thetai
+      (defs, tms', r) <- declarePats pats tele
+      pure (defs, DataCon dc tms', r)
+    else Env.err [DS "Wrong number of arguments to data constructor", DC cn]
 
 -- | Given a list of pattern arguments and a telescope, create a binding for
 -- each of the variables in the pattern, the term form of the pattern, and a refinement
@@ -450,17 +444,15 @@ declarePats ::
   Telescope pt n ->
   TcMonad n (Telescope p n, [Term (p + n)], Refinement Term (p + n))
 declarePats pats (TCons (LocalDef x ty) (tele :: Telescope p1 n)) = do
-  case axiomPlusZ @p1 of
-    Refl -> do
-      let r0 = singletonR (x, ty)
-      ss <- Env.scopeSize
-      tele' <- withSNat ss $ doSubst @Z False (fromRefinement r0) tele
-      (defs, tms', rf) <- declarePats pats tele'
-      let r1 = shift (size pats) r0
-      r' <-
-        withSNat (sPlus (size pats) ss) $
-          joinR r1 rf `Env.whenNothing` [DS "Cannot create refinement"]
-      pure (defs, tms', r')
+  let r0 = singletonR (x, ty)
+  ss <- Env.scopeSize
+  tele' <- withSNat ss $ doSubst @Z False (fromRefinement r0) tele
+  (defs, tms', rf) <- declarePats pats tele'
+  let r1 = shift (size pats) r0
+  r' <-
+    withSNat (sPlus (size pats) ss) $
+      joinR r1 rf `Env.whenNothing` [DS "Cannot create refinement"]
+  pure (defs, tms', r')
 declarePats
   (PCons (p1 :: Pattern p1) (p2 :: PatList Pattern p2))
   (TCons (LocalDecl x ty1) (tele2 :: Telescope p3 (S n))) =
