@@ -231,7 +231,7 @@ instance Subst Term (Local p) where
   applyE r (LocalDef x u) =
     case applyE r (Var x) of
       Var y -> LocalDef y (applyE r u)
-      _ -> error "TODO! can only rename LocalDefs"
+      _ -> error "Error: cannot substitute left hand side of constraint."
 
 ----------------------------------------------
 -- Free variable calculation

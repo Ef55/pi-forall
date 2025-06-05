@@ -17,6 +17,16 @@ module PiForall.Rebound.ScopeCheck
   )
 where
 
+import Control.Monad (foldM)
+import Control.Monad qualified as Monad
+import Control.Monad.Reader (MonadReader (ask), Reader, asks, runReader)
+import Data.Fin qualified as Fin
+import Data.Fin qualified as Nat
+import Data.Maybe (fromJust)
+import Data.Maybe qualified as Maybe
+import Data.Vec qualified as Vec
+import PiForall.ConcreteSyntax qualified as C
+import PiForall.Rebound.Syntax qualified as S
 import Rebound qualified
 import Rebound.Bind.Local qualified as L
 import Rebound.Bind.Pat (PatList (..))
@@ -27,16 +37,6 @@ import Rebound.Bind.Single qualified as B
 import Rebound.Lib
 import Rebound.MonadNamed (ScopedReader)
 import Rebound.MonadNamed qualified as Scoped
-import Control.Monad (foldM)
-import Control.Monad qualified as Monad
-import Control.Monad.Reader (MonadReader (ask), Reader, asks, runReader)
-import Data.Fin qualified as Fin
-import Data.Fin qualified as Nat
-import Data.Maybe (fromJust)
-import Data.Maybe qualified as Maybe
-import Data.Vec qualified as Vec
-import PiForall.Rebound.Syntax qualified as S
-import PiForall.ConcreteSyntax qualified as C
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -322,17 +322,17 @@ instance Scoping n (Vec n C.Term) (SNat n, Rebound.Env S.Term n n) where
         ts :: Vec n (S.Term n) = Rebound.applyE env . S.Var <$> u
     mapM unscope' ts
 
-instance Scoping Z (Vec n (LocalName, C.Term)) (SNat n, Vec n LocalName, Rebound.Env S.Term n n) where
-  -- scope' Vec.VNil = return (SZ, DS.empty)
-  -- scope' ((hx, ht) Vec.::: t) = do
-  --   ht' :: S.Term n <- scope' ht
-  --   (p', t' :: DS.Telescope LocalName S.Term p' (S n)) <- DS.push1 (hx, ht') $ scope' t
-  --   let p = withSNat p SS
-  --   return $ case axiomAssoc of Refl -> (p, DS.TCons (hx, ht') t')
-  scope' v = error "TODO: implement"
+instance Scoping Z (Vec n (LocalName, C.Term)) (SNat n, Vec n LocalName, Rebound.Ctx S.Term n) where
+  -- Note: this is not used anywhere
+  scope' v = case axiomPlusZ @n of
+    Refl -> do
+      let names = fst <$> v
+          terms = snd <$> v
+      t' <- Scoped.push names $ mapM scope' terms
+      return (Vec.vlength v, names, Rebound.fromVec t')
 
-  -- iter :: Vec p (LocalName, C.Term) -> (DS.Telescope LocalName S.Term p n -> Scope (p + n) (DS.Telescope LocalName S.Term (S p) n)) -> DS.Telescope LocalName S.Term
-
-  unscope' (p, n, t) = do
-    t' <- case axiomPlusZ @n of Refl -> Scoped.push n $ unscope' (p, t)
-    return $ Vec.zipWith (,) n t'
+  unscope' (p, n, t) = case axiomPlusZ @n of
+    Refl ->
+      do
+        t' <- Scoped.push n $ unscope' (p, t)
+        return $ Vec.zipWith (,) n t'

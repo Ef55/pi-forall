@@ -137,7 +137,6 @@ ensureTCon aty = do
 -------------------------------------------------------
 
 -- | Convert a term to its weak-head normal form.
--- | TODO: add explicit environment (?)
 -- But need to find out the types of every binder
 whnf :: forall n. Term n -> TcMonad n (Term n)
 whnf (Global y) =
